@@ -38,13 +38,12 @@ export function CollabEditor({
 
   if (conn === 'deleted') {
     return (
-      <div className="panel rounded-[1.5rem] p-8">
-        <h1 className="text-2xl font-semibold">Document deleted</h1>
-        <p className="mt-2 text-muted">
-          Someone removed this page while you were connected. The editor is
-          locked.
+      <div className="panel p-5">
+        <h1 className="text-base font-semibold">Document deleted</h1>
+        <p className="mt-1 text-[13px] text-muted">
+          This page was removed while you were connected.
         </p>
-        <Link href={`/app/w/${workspaceId}`} className="btn btn-primary mt-6">
+        <Link href={`/app/w/${workspaceId}`} className="btn btn-primary mt-4">
           Back to workspace
         </Link>
       </div>
@@ -53,12 +52,12 @@ export function CollabEditor({
 
   if (conn === 'revoked') {
     return (
-      <div className="panel rounded-[1.5rem] p-8">
-        <h1 className="text-2xl font-semibold">Access revoked</h1>
-        <p className="mt-2 text-muted">
-          Your permission to this page was removed. Live editing is closed.
+      <div className="panel p-5">
+        <h1 className="text-base font-semibold">Access revoked</h1>
+        <p className="mt-1 text-[13px] text-muted">
+          Your permission to this page was removed.
         </p>
-        <Link href="/app" className="btn btn-primary mt-6">
+        <Link href="/app" className="btn btn-primary mt-4">
           Back to app
         </Link>
       </div>
@@ -66,7 +65,7 @@ export function CollabEditor({
   }
 
   const statusLabel = !browserOnline
-    ? 'Offline (browser)'
+    ? 'Offline'
     : conn === 'online'
       ? 'Live'
       : conn === 'connecting'
@@ -74,34 +73,41 @@ export function CollabEditor({
         : 'Reconnecting…';
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-      <aside className="panel space-y-4 rounded-2xl p-4">
+    <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
+      <aside className="panel space-y-3 p-3">
         <Link
           href={showAccessPanel ? `/app/w/${workspaceId}` : '/app'}
-          className="text-sm text-muted"
+          className="text-[13px] text-muted hover:text-ink"
         >
           ← {showAccessPanel ? 'Documents' : 'App'}
         </Link>
         <div>
-          <p className="text-sm text-muted">Status</p>
-          <p className="font-semibold">{statusLabel}</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted">
+            Status
+          </p>
+          <p className="text-sm font-medium">{statusLabel}</p>
           {!canEdit && conn === 'online' ? (
-            <p className="mt-1 text-xs text-muted">View only</p>
+            <p className="mt-0.5 text-[12px] text-muted">View only</p>
           ) : null}
         </div>
         <div>
-          <p className="mb-2 text-sm text-muted">Present</p>
+          <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">
+            Present
+          </p>
           {presence.length === 0 ? (
-            <p className="empty text-sm">Just you</p>
+            <p className="empty">Just you</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {presence.map((user) => (
-                <li key={user.userId} className="flex items-center gap-2 text-sm">
+                <li
+                  key={user.userId}
+                  className="flex items-center gap-2 text-[13px]"
+                >
                   <span
-                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    className="inline-block h-1.5 w-1.5 rounded-full"
                     style={{ background: user.color }}
                   />
-                  <span>{user.displayName}</span>
+                  <span className="truncate">{user.displayName}</span>
                 </li>
               ))}
             </ul>
@@ -115,22 +121,22 @@ export function CollabEditor({
             members={members}
           />
         ) : (
-          <p className="border-t border-line pt-4 text-xs text-muted">
+          <p className="border-t border-line pt-3 text-[12px] text-muted">
             Access via share link
           </p>
         )}
       </aside>
 
-      <section className="panel min-h-[28rem] rounded-[1.5rem] p-6 md:p-8">
+      <section className="panel min-h-[24rem] p-4 md:p-5">
         <input
-          className="w-full border-0 bg-transparent text-3xl font-semibold tracking-tight outline-none"
+          className="w-full border-0 bg-transparent text-xl font-semibold tracking-tight outline-none placeholder:text-neutral-400"
           value={title}
           disabled={!canEdit || conn !== 'online'}
           onChange={(event) => updateTitle(event.target.value)}
           placeholder="Untitled"
         />
 
-        <div className="mt-8 space-y-4">
+        <div className="mt-5 space-y-3">
           {blocks.length === 0 ? (
             <p className="empty">No blocks yet.</p>
           ) : (
@@ -141,7 +147,7 @@ export function CollabEditor({
                   .map((user) => (
                     <span
                       key={user.userId}
-                      className="mb-1 mr-2 inline-block rounded-full px-2 py-0.5 text-[11px] text-white"
+                      className="mb-1 mr-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] text-white"
                       style={{ background: user.color }}
                     >
                       {user.displayName}
@@ -149,18 +155,20 @@ export function CollabEditor({
                   ))}
 
                 {block.type === 'checkbox' ? (
-                  <label className="flex items-start gap-3">
+                  <label className="flex items-start gap-2">
                     <input
                       type="checkbox"
-                      className="mt-2"
+                      className="mt-1.5"
                       checked={!!block.checked}
                       disabled={!canEdit || conn !== 'online'}
                       onChange={(event) =>
-                        updateBlock(block.id, { checked: event.target.checked })
+                        updateBlock(block.id, {
+                          checked: event.target.checked,
+                        })
                       }
                     />
                     <textarea
-                      className="field min-h-[2.75rem] resize-y"
+                      className="field min-h-[2.25rem] resize-y"
                       value={block.text}
                       disabled={!canEdit || conn !== 'online'}
                       onChange={(event) =>
@@ -190,13 +198,13 @@ export function CollabEditor({
                       <img
                         src={block.src}
                         alt={block.text || ''}
-                        className="max-h-72 rounded-xl"
+                        className="max-h-64 rounded-md"
                       />
                     ) : null}
                   </div>
                 ) : block.type === 'list' ? (
                   <textarea
-                    className="field min-h-[5rem] resize-y font-mono text-sm"
+                    className="field min-h-[4rem] resize-y font-mono text-[13px]"
                     value={(block.items ?? ['']).join('\n')}
                     disabled={!canEdit || conn !== 'online'}
                     placeholder="One item per line"
@@ -217,10 +225,10 @@ export function CollabEditor({
                   <textarea
                     className={`field resize-y ${
                       block.type === 'heading'
-                        ? 'min-h-[3rem] text-xl font-semibold'
+                        ? 'min-h-[2.5rem] text-base font-semibold'
                         : block.type === 'code'
-                          ? 'min-h-[7rem] font-mono text-sm'
-                          : 'min-h-[3.5rem]'
+                          ? 'min-h-[6rem] font-mono text-[13px]'
+                          : 'min-h-[2.75rem]'
                     }`}
                     value={block.text}
                     disabled={!canEdit || conn !== 'online'}
@@ -238,12 +246,12 @@ export function CollabEditor({
 
                 {canEdit && conn === 'online' ? (
                   <div className="mt-1 flex flex-wrap gap-2 opacity-0 transition group-hover:opacity-100">
-                    <span className="rounded-full border border-line px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted">
+                    <span className="text-[11px] uppercase tracking-wide text-muted">
                       {block.type}
                     </span>
                     <button
                       type="button"
-                      className="text-xs text-danger"
+                      className="text-[12px] text-danger"
                       onClick={() => removeBlock(block.id)}
                     >
                       Remove
@@ -254,7 +262,9 @@ export function CollabEditor({
                   documentId={documentId}
                   blockId={block.id}
                   canComment={canEdit && conn === 'online'}
-                  mentionHints={members.map((member) => member.user.displayName)}
+                  mentionHints={members.map(
+                    (member) => member.user.displayName,
+                  )}
                 />
               </div>
             ))
@@ -262,7 +272,7 @@ export function CollabEditor({
         </div>
 
         {canEdit && conn === 'online' ? (
-          <div className="mt-8 flex flex-wrap gap-2 border-t border-line pt-5">
+          <div className="mt-5 flex flex-wrap gap-1.5 border-t border-line pt-3">
             {BLOCK_TYPES.map((type) => (
               <button
                 key={type}

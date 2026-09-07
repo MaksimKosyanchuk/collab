@@ -1,14 +1,9 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Source_Serif_4 } from 'next/font/google';
+import { Geist } from 'next/font/google';
 import './globals.css';
 
-const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
-  subsets: ['latin'],
-});
-
-const sourceSerif = Source_Serif_4({
-  variable: '--font-source-serif',
+const geist = Geist({
+  variable: '--font-sans-app',
   subsets: ['latin'],
 });
 
@@ -24,9 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${dmSans.variable} ${sourceSerif.variable} antialiased`}>
-        {children}
-      </body>
+      <body className={`${geist.variable} antialiased`}>{children}</body>
     </html>
   );
 }

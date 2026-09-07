@@ -25,24 +25,24 @@ export function AuthForm({
       : '/login';
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-5 py-12">
-      <div className="panel rounded-[1.5rem] p-8">
-        <p className="brand text-3xl text-ink">Collab Docs</p>
-        <h1 className="mt-3 text-xl font-semibold text-ink">
-          {mode === 'login' ? 'Welcome back' : 'Create your account'}
+    <div className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center px-4 py-10">
+      <div className="panel p-5">
+        <p className="brand text-lg text-ink">Collab Docs</p>
+        <h1 className="mt-2 text-base font-semibold text-ink">
+          {mode === 'login' ? 'Sign in' : 'Create account'}
         </h1>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-[13px] text-muted">
           {next
-            ? 'Sign in to open the shared document.'
+            ? 'Continue to open the shared document.'
             : mode === 'login'
-              ? 'Sign in to continue to your workspaces.'
-              : 'Start a workspace and invite collaborators later.'}
+              ? 'Access your workspaces.'
+              : 'Start a workspace in a minute.'}
         </p>
 
-        <form action={formAction} className="mt-8 space-y-3">
+        <form action={formAction} className="mt-5 space-y-2.5">
           {next ? <input type="hidden" name="next" value={next} /> : null}
           {mode === 'register' ? (
-            <label className="block space-y-1.5 text-sm">
+            <label className="block space-y-1 text-[13px]">
               <span className="text-muted">Display name</span>
               <input
                 className="field"
@@ -54,7 +54,7 @@ export function AuthForm({
               />
             </label>
           ) : null}
-          <label className="block space-y-1.5 text-sm">
+          <label className="block space-y-1 text-[13px]">
             <span className="text-muted">Email</span>
             <input
               className="field"
@@ -64,7 +64,7 @@ export function AuthForm({
               placeholder="you@example.com"
             />
           </label>
-          <label className="block space-y-1.5 text-sm">
+          <label className="block space-y-1 text-[13px]">
             <span className="text-muted">Password</span>
             <input
               className="field"
@@ -78,7 +78,7 @@ export function AuthForm({
 
           {state?.error ? <p className="error">{state.error}</p> : null}
 
-          <button className="btn btn-primary mt-2 w-full" disabled={pending}>
+          <button className="btn btn-primary mt-1 w-full" disabled={pending}>
             {pending
               ? 'Please wait…'
               : mode === 'login'
@@ -87,18 +87,18 @@ export function AuthForm({
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-muted">
+        <p className="mt-4 text-center text-[13px] text-muted">
           {mode === 'login' ? (
             <>
               No account?{' '}
-              <Link className="font-semibold text-accent" href={otherHref}>
+              <Link className="font-medium text-ink underline-offset-2 hover:underline" href={otherHref}>
                 Register
               </Link>
             </>
           ) : (
             <>
               Already registered?{' '}
-              <Link className="font-semibold text-accent" href={otherHref}>
+              <Link className="font-medium text-ink underline-offset-2 hover:underline" href={otherHref}>
                 Sign in
               </Link>
             </>

@@ -21,19 +21,21 @@ export function DocumentTree({
     workspace.myRole === 'EDITOR';
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-      <div className="space-y-6">
-        <section className="panel rounded-[1.5rem] p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-muted">Workspace</p>
-              <h1 className="text-2xl font-semibold">{workspace.name}</h1>
-              <p className="mt-1 text-sm text-muted">
-                Plan {workspace.plan}
-                {workspace.myRole ? ` · you are ${workspace.myRole}` : ''}
+    <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+      <div className="space-y-3">
+        <section className="panel p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide text-muted">
+                Workspace
+              </p>
+              <h1 className="truncate text-sm font-semibold">{workspace.name}</h1>
+              <p className="mt-0.5 text-[12px] text-muted">
+                {workspace.plan}
+                {workspace.myRole ? ` · ${workspace.myRole}` : ''}
               </p>
             </div>
-            <Link href="/app" className="btn btn-ghost">
+            <Link href="/app" className="btn btn-ghost shrink-0">
               All
             </Link>
           </div>
@@ -44,8 +46,11 @@ export function DocumentTree({
             canEdit={canEditTree}
           />
 
-          <form action={create} className="mt-6 space-y-3 border-t border-line pt-5">
-            <p className="text-sm font-medium">New page</p>
+          <form
+            action={create}
+            className="mt-3 space-y-2 border-t border-line pt-3"
+          >
+            <p className="text-[13px] font-medium">New page</p>
             <input
               className="field"
               name="title"
@@ -53,7 +58,7 @@ export function DocumentTree({
               maxLength={200}
             />
             <button className="btn btn-primary w-full" type="submit">
-              Create document
+              Create
             </button>
           </form>
         </section>
@@ -75,11 +80,11 @@ export function DocumentTree({
         />
       </div>
 
-      <section className="panel flex min-h-72 items-center justify-center rounded-[1.5rem] p-8 text-center">
+      <section className="panel flex min-h-64 items-center justify-center p-6 text-center">
         <div>
-          <p className="brand text-3xl">Pick a page</p>
-          <p className="mt-2 max-w-sm text-muted">
-            Open a document to collaborate in real time.
+          <p className="text-sm font-medium">Select a page</p>
+          <p className="mt-1 max-w-xs text-[13px] text-muted">
+            Open a document from the tree to edit in real time.
           </p>
         </div>
       </section>
