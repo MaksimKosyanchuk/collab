@@ -1,0 +1,440 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum DocumentAccess {
+  VIEW
+  EDIT
+  MANAGE
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  TEAM
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum CheckoutStatus {
+  OPEN
+  COMPLETED
+  EXPIRED
+}
+
+enum PublicationStatus {
+  UNPUBLISHED
+  PUBLISHED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum VersionTrigger {
+  AUTO
+  MANUAL
+  RESTORE
+}
+
+enum NotificationType {
+  MENTION
+  COMMENT
+  INVITE
+  DOCUMENT_SHARED
+  PLAN_CHANGED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens       RefreshToken[]
+  ownedWorkspaces     Workspace[]          @relation("WorkspaceOwner")
+  memberships         WorkspaceMember[]
+  invitationsSent     WorkspaceInvitation[] @relation("InvitationInviter")
+  documentsCreated    Document[]           @relation("DocumentCreator")
+  documentShares      DocumentShare[]
+  publicLinksCreated  DocumentPublicLink[] @relation("PublicLinkCreator")
+  versionsCreated     DocumentVersion[]    @relation("VersionCreator")
+  commentThreads      CommentThread[]
+  comments            Comment[]
+  notifications       Notification[]
+  assetsUploaded      Asset[]
+  logs                Log[]
+
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workspace {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  ownerId          String
+  plan             PlanTier @default(FREE)
+  storageUsedBytes BigInt   @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  owner        User                   @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members      WorkspaceMember[]
+  invitations  WorkspaceInvitation[]
+  documents    Document[]
+  assets       Asset[]
+  subscription Subscription?
+  checkouts    CheckoutSession[]
+  billingEvents BillingEvent[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId, role])
+}
+
+model WorkspaceInvitation {
+  id          String           @id @default(uuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, email, status])
+  @@index([workspaceId])
+}
+
+model Document {
+  id                String             @id @default(uuid())
+  workspaceId       String
+  parentId          String?
+  title             String             @default("Untitled")
+  rank              String
+  createdById       String
+  publicationStatus PublicationStatus  @default(UNPUBLISHED)
+  publicSlug        String?            @unique
+  publishedAt       DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent      Document?            @relation("DocumentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Document[]           @relation("DocumentTree")
+  createdBy   User                 @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  shares      DocumentShare[]
+  publicLinks DocumentPublicLink[]
+  collabState DocumentCollabState?
+  collabUpdates DocumentCollabUpdate[]
+  versions    DocumentVersion[]
+  projection  DocumentProjection?
+  threads     CommentThread[]
+  assets      Asset[]
+
+  @@index([workspaceId, deletedAt])
+  @@index([workspaceId, parentId, rank])
+  @@index([parentId])
+  @@index([createdById])
+}
+
+model DocumentShare {
+  id         String         @id @default(uuid())
+  documentId String
+  userId     String
+  access     DocumentAccess
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@index([userId])
+  @@index([documentId])
+}
+
+model DocumentPublicLink {
+  id          String         @id @default(uuid())
+  documentId  String
+  tokenHash   String         @unique
+  tokenPrefix String
+  access      DocumentAccess
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdById String
+  createdAt   DateTime       @default(now())
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User     @relation("PublicLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([documentId])
+}
+
+model DocumentCollabState {
+  documentId   String   @id
+  state        Bytes
+  updateCount  Int      @default(0)
+  compactedAt  DateTime?
+  updatedAt    DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model DocumentCollabUpdate {
+  id         String   @id @default(uuid())
+  documentId String
+  payload    Bytes
+  hash       String
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, hash])
+  @@index([documentId, createdAt])
+}
+
+model DocumentVersion {
+  id          String         @id @default(uuid())
+  documentId  String
+  state       Bytes
+  title       String
+  trigger     VersionTrigger @default(AUTO)
+  createdById String?
+  createdAt   DateTime       @default(now())
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("VersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt])
+}
+
+model DocumentProjection {
+  documentId  String   @id
+  title       String
+  description String   @default("")
+  blocksJson  Json
+  plainText   String   @default("")
+  projectedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model CommentThread {
+  id         String    @id @default(uuid())
+  documentId String
+  blockId    String
+  resolvedAt DateTime?
+  createdById String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  document  Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  comments  Comment[]
+
+  @@index([documentId, blockId])
+  @@index([documentId])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  threadId  String
+  authorId  String
+  body      String
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  thread CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([threadId, createdAt])
+}
+
+model Subscription {
+  id               String             @id @default(uuid())
+  workspaceId      String             @unique
+  plan             PlanTier           @default(FREE)
+  status           SubscriptionStatus @default(ACTIVE)
+  mockCustomerId   String?
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model CheckoutSession {
+  id          String         @id @default(uuid())
+  workspaceId String
+  plan        PlanTier
+  status      CheckoutStatus @default(OPEN)
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+}
+
+model BillingEvent {
+  id          String   @id @default(uuid())
+  externalId  String   @unique
+  type        String
+  workspaceId String
+  payload     Json
+  processedAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, processedAt])
+}
+
+model Asset {
+  id           String    @id @default(uuid())
+  workspaceId  String
+  documentId   String?
+  uploadedById String
+  objectKey    String    @unique
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime  @default(now())
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  uploadedBy User      @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([documentId])
+}
+
+model OutboxEvent {
+  id             String       @id @default(uuid())
+  type           String
+  aggregateType  String
+  aggregateId    String
+  payload        Json
+  status         OutboxStatus @default(PENDING)
+  idempotencyKey String       @unique
+  attempts       Int          @default(0)
+  availableAt    DateTime     @default(now())
+  processedAt    DateTime?
+  lastError      String?
+  correlationId  String?
+  createdAt      DateTime     @default(now())
+
+  receipts EventConsumerReceipt[]
+
+  @@index([status, availableAt])
+  @@index([aggregateType, aggregateId])
+  @@index([type, createdAt])
+}
+
+model EventConsumerReceipt {
+  id           String      @id @default(uuid())
+  eventId      String
+  consumerName String
+  processedAt  DateTime    @default(now())
+  attempts     Int         @default(0)
+  lastError    String?
+  event        OutboxEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, consumerName])
+  @@index([consumerName, processedAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  eventId   String
+  type      NotificationType
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+model Log {
+  id            String   @id @default(uuid())
+  level         String
+  context       String
+  message       String
+  correlationId String?
+  userId        String?
+  meta          Json?
+  createdAt     DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([level])
+  @@index([correlationId])
+}

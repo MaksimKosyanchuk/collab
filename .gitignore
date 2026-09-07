@@ -13,3 +13,5 @@ docs/graphify-out/cache/
 docs/graphify-out/.graphify_*.json
 docs/graphify-out/.vocab.txt
 .cursor/
+
+docs/
