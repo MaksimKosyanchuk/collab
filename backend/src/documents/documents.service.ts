@@ -7,7 +7,7 @@ import { PlanTier, PublicationStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import sanitizeHtml from 'sanitize-html';
 import { AccessService, AccessContext, hashToken } from '../access/access.service';
-import { canEdit, canManage, documentAccessToLevel, workspaceRoleToAccess } from '../access/access.policy';
+import { canEdit, canManage } from '../access/access.policy';
 import { CollabPersistenceService } from '../collab/collab-persistence.service';
 import { CollabRoomsService } from '../collab/collab-rooms.service';
 import { PlanLimitException } from '../common/exceptions/plan-limit.exception';
@@ -53,7 +53,7 @@ export class DocumentsService {
     userId: string,
     dto: CreateDocumentDto,
   ) {
-    await this.access.assertWorkspaceMember(workspaceId, userId);
+    await this.access.assertWorkspaceDocumentCreate(workspaceId, userId);
     const workspace = await this.prisma.workspace.findUniqueOrThrow({
       where: { id: workspaceId },
     });
@@ -371,14 +371,10 @@ export class DocumentsService {
         },
       },
     });
-    if (member) {
-      const memberLevel = workspaceRoleToAccess(member.role);
-      const invitedLevel = documentAccessToLevel(dto.access);
-      if (invitedLevel <= memberLevel) {
-        throw new BadRequestException(
-          'User already has equal or higher access via workspace role',
-        );
-      }
+    if (member?.role === 'OWNER' || member?.role === 'ADMIN') {
+      throw new BadRequestException(
+        'Owner/Admin already have full access; document permission cannot change it',
+      );
     }
 
     const existingShare = await this.prisma.documentShare.findUnique({
@@ -386,14 +382,10 @@ export class DocumentsService {
         documentId_userId: { documentId, userId: existingUser.id },
       },
     });
-    if (existingShare) {
-      const shareLevel = documentAccessToLevel(existingShare.access);
-      const invitedLevel = documentAccessToLevel(dto.access);
-      if (invitedLevel <= shareLevel) {
-        throw new BadRequestException(
-          'User already has equal or higher access to this page',
-        );
-      }
+    if (existingShare && existingShare.access === dto.access) {
+      throw new BadRequestException(
+        'User already has this document permission',
+      );
     }
 
     const pending = await this.prisma.documentShareInvitation.findFirst({

@@ -4,6 +4,7 @@ import { Document } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AccessLevelValue,
+  canCreateWorkspaceDocuments,
   canEdit,
   canManage,
   canView,
@@ -41,6 +42,15 @@ export class AccessService {
     const role = await this.assertWorkspaceMember(workspaceId, userId);
     if (role !== 'OWNER' && role !== 'ADMIN') {
       throw new ForbiddenException('Workspace admin role required');
+    }
+    return role;
+  }
+
+  /** Create/move-in-tree at workspace scope (Viewer cannot create pages). */
+  async assertWorkspaceDocumentCreate(workspaceId: string, userId: string) {
+    const role = await this.assertWorkspaceMember(workspaceId, userId);
+    if (!canCreateWorkspaceDocuments(role)) {
+      throw new ForbiddenException('Editor role required to create documents');
     }
     return role;
   }

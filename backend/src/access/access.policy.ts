@@ -40,16 +40,39 @@ export function documentAccessToLevel(
   return AccessLevel.NONE;
 }
 
+/**
+ * Access resolution (first match wins):
+ * 1. Owner/Admin — always MANAGE (document permission cannot restrict them)
+ * 2. Explicit DocumentShare for this user — overrides workspace role
+ * 3. Workspace role (Editor / Viewer)
+ * 4. Public link token (outsiders)
+ * 5. NONE → caller returns 403
+ */
 export function resolveDocumentAccess(input: {
   workspaceRole?: WorkspaceRoleInput | null;
   shareAccess?: DocumentAccessInput | null;
   publicLinkAccess?: DocumentAccessInput | null;
 }): AccessLevelValue {
-  return Math.max(
-    workspaceRoleToAccess(input.workspaceRole),
-    documentAccessToLevel(input.shareAccess),
-    documentAccessToLevel(input.publicLinkAccess),
-  ) as AccessLevelValue;
+  const role = input.workspaceRole ?? null;
+
+  if (role === 'OWNER' || role === 'ADMIN') {
+    return AccessLevel.MANAGE;
+  }
+
+  if (input.shareAccess != null) {
+    return documentAccessToLevel(input.shareAccess);
+  }
+
+  const fromWorkspace = workspaceRoleToAccess(role);
+  if (fromWorkspace > AccessLevel.NONE) {
+    return fromWorkspace;
+  }
+
+  if (input.publicLinkAccess != null) {
+    return documentAccessToLevel(input.publicLinkAccess);
+  }
+
+  return AccessLevel.NONE;
 }
 
 export function canView(level: AccessLevelValue): boolean {
@@ -62,4 +85,13 @@ export function canEdit(level: AccessLevelValue): boolean {
 
 export function canManage(level: AccessLevelValue): boolean {
   return level >= AccessLevel.MANAGE;
+}
+
+/** Workspace-level create / tree mutate (not document-share elevated). */
+export function canCreateWorkspaceDocuments(
+  role: WorkspaceRoleInput | null | undefined,
+): boolean {
+  return (
+    role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR'
+  );
 }

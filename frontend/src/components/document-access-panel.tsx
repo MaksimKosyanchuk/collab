@@ -120,9 +120,10 @@ export function DocumentAccessPanel({
           <div>
             <p className="text-[13px] font-medium">Share page</p>
             <p className="mt-0.5 text-[12px] text-muted">
-              Invite by email → Accept in Alerts. Workspace members already see
-              pages by role; use this to raise a Viewer to Edit on this page, or
-              share with someone outside the workspace.
+              Document permission overrides workspace role for this page only
+              (e.g. Viewer→Edit or Editor→View). Owner/Admin stay full access.
+              Outsiders get access without joining the workspace. Invite → Accept
+              in Alerts.
             </p>
             <div className="mt-2 space-y-2">
               <input

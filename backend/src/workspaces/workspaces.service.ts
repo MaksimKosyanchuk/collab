@@ -353,6 +353,8 @@ export class WorkspacesService {
       throw new BadRequestException('Cannot remove the owner');
     }
     await this.assertNotLastManager(workspaceId, memberUserId, null);
+    // DocumentShare rows are kept: user may still open pages shared
+    // explicitly without workspace membership (external document access).
     await this.prisma.workspaceMember.delete({ where: { id: member.id } });
     await this.rooms.revalidateUserInWorkspace(workspaceId, memberUserId);
   }
@@ -370,6 +372,7 @@ export class WorkspacesService {
       );
     }
     await this.assertNotLastManager(workspaceId, userId, null);
+    // Keep DocumentShare: leaving the workspace does not revoke page-level shares.
     await this.prisma.workspaceMember.delete({ where: { id: member.id } });
     await this.rooms.revalidateUserInWorkspace(workspaceId, userId);
     return { left: true, workspaceId };
