@@ -1,3 +1,5 @@
+import { RouteLoading } from '@/components/route-state';
+
 export default function Loading() {
-  return <p className="empty">Loading workspaces…</p>;
+  return <RouteLoading label="Loading workspaces…" />;
 }
