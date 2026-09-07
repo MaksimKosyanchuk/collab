@@ -1,6 +1,6 @@
 import { DocumentTree } from '@/components/document-tree';
 import { serverApi } from '@/lib/api';
-import type { DocumentTreeItem, Workspace } from '@/lib/types';
+import type { DocumentTreeItem, WorkspaceDetail } from '@/lib/types';
 
 type Props = {
   params: Promise<{ workspaceId: string }>;
@@ -11,19 +11,11 @@ export default async function WorkspacePage({ params }: Props) {
 
   try {
     const [workspace, documents] = await Promise.all([
-      serverApi<Workspace & { members?: unknown[] }>(
-        `/workspaces/${workspaceId}`,
-      ),
+      serverApi<WorkspaceDetail>(`/workspaces/${workspaceId}`),
       serverApi<DocumentTreeItem[]>(`/workspaces/${workspaceId}/documents`),
     ]);
 
-    return (
-      <DocumentTree
-        workspaceId={workspaceId}
-        workspaceName={workspace.name}
-        documents={documents}
-      />
-    );
+    return <DocumentTree workspace={workspace} documents={documents} />;
   } catch (error) {
     return (
       <div className="panel rounded-2xl p-6">

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createDocumentAction } from '@/lib/actions';
-import type { DocumentTreeItem } from '@/lib/types';
+import { WorkspaceMembersPanel } from '@/components/workspace-members-panel';
+import type { DocumentTreeItem, WorkspaceDetail } from '@/lib/types';
 
 function buildForest(items: DocumentTreeItem[]) {
   const byParent = new Map<string | null, DocumentTreeItem[]>();
@@ -60,59 +61,69 @@ function TreeNodes({
 }
 
 export function DocumentTree({
-  workspaceId,
-  workspaceName,
+  workspace,
   documents,
 }: {
-  workspaceId: string;
-  workspaceName: string;
+  workspace: WorkspaceDetail;
   documents: DocumentTreeItem[];
 }) {
   const byParent = buildForest(documents);
-  const create = createDocumentAction.bind(null, workspaceId);
+  const create = createDocumentAction.bind(null, workspace.id);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-      <section className="panel rounded-[1.5rem] p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted">Workspace</p>
-            <h1 className="text-2xl font-semibold">{workspaceName}</h1>
+    <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="space-y-6">
+        <section className="panel rounded-[1.5rem] p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted">Workspace</p>
+              <h1 className="text-2xl font-semibold">{workspace.name}</h1>
+              <p className="mt-1 text-sm text-muted">
+                Plan {workspace.plan}
+                {workspace.myRole ? ` · you are ${workspace.myRole}` : ''}
+              </p>
+            </div>
+            <Link href="/app" className="btn btn-ghost">
+              All
+            </Link>
           </div>
-          <Link href="/app" className="btn btn-ghost">
-            All
-          </Link>
-        </div>
 
-        <div className="mt-6">
-          <TreeNodes
-            workspaceId={workspaceId}
-            parentId={null}
-            byParent={byParent}
-            depth={0}
-          />
-        </div>
+          <div className="mt-6">
+            <TreeNodes
+              workspaceId={workspace.id}
+              parentId={null}
+              byParent={byParent}
+              depth={0}
+            />
+          </div>
 
-        <form action={create} className="mt-6 space-y-3 border-t border-line pt-5">
-          <p className="text-sm font-medium">New page</p>
-          <input
-            className="field"
-            name="title"
-            placeholder="Untitled"
-            maxLength={200}
-          />
-          <button className="btn btn-primary w-full" type="submit">
-            Create document
-          </button>
-        </form>
-      </section>
+          <form action={create} className="mt-6 space-y-3 border-t border-line pt-5">
+            <p className="text-sm font-medium">New page</p>
+            <input
+              className="field"
+              name="title"
+              placeholder="Untitled"
+              maxLength={200}
+            />
+            <button className="btn btn-primary w-full" type="submit">
+              Create document
+            </button>
+          </form>
+        </section>
+
+        <WorkspaceMembersPanel
+          workspaceId={workspace.id}
+          members={workspace.members}
+          invitations={workspace.invitations ?? []}
+          myRole={workspace.myRole}
+        />
+      </div>
 
       <section className="panel flex min-h-72 items-center justify-center rounded-[1.5rem] p-8 text-center">
         <div>
           <p className="brand text-3xl">Pick a page</p>
           <p className="mt-2 max-w-sm text-muted">
-            The CRDT editor and presence will mount here as a Client Component
-            connected to <code className="text-ink">/collab</code>.
+            Open a document to collaborate in real time.
           </p>
         </div>
       </section>

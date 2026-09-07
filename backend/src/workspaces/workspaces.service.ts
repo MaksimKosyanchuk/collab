@@ -70,15 +70,30 @@ export class WorkspacesService {
           },
           orderBy: { createdAt: 'asc' },
         },
+        invitations: {
+          where: { status: 'PENDING' },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            expiresAt: true,
+            createdAt: true,
+          },
+        },
         subscription: true,
       },
     });
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
     }
+    const role = await this.access.getWorkspaceRole(workspaceId, userId);
+    const canManage = role === 'OWNER' || role === 'ADMIN';
     return {
       ...toWorkspaceDto(workspace),
       members: workspace.members,
+      invitations: canManage ? workspace.invitations : [],
+      myRole: role,
       subscription: workspace.subscription,
     };
   }
@@ -106,6 +121,44 @@ export class WorkspacesService {
       if (member) {
         throw new BadRequestException('User is already a member');
       }
+
+      const added = await this.prisma.workspaceMember.create({
+        data: {
+          workspaceId,
+          userId: existingUser.id,
+          role: dto.role,
+        },
+        include: {
+          user: {
+            select: { id: true, email: true, displayName: true },
+          },
+        },
+      });
+      await this.outbox.enqueue({
+        type: 'notification.invite',
+        aggregateType: 'workspace',
+        aggregateId: workspaceId,
+        idempotencyKey: `invite-add:${workspaceId}:${existingUser.id}:${Date.now()}`,
+        payload: {
+          email,
+          role: dto.role,
+          addedDirectly: true,
+        },
+      });
+      return {
+        status: 'added' as const,
+        email,
+        role: dto.role,
+        member: added,
+        token: null,
+      };
+    }
+
+    const pending = await this.prisma.workspaceInvitation.findFirst({
+      where: { workspaceId, email, status: 'PENDING' },
+    });
+    if (pending && pending.expiresAt > new Date()) {
+      throw new BadRequestException('Invitation already pending for this email');
     }
 
     const token = randomBytes(24).toString('base64url');
@@ -126,7 +179,14 @@ export class WorkspacesService {
       idempotencyKey: `invite:${invitation.id}`,
       payload: { invitationId: invitation.id, email },
     });
-    return { id: invitation.id, token, email, role: dto.role };
+    return {
+      status: 'invited' as const,
+      id: invitation.id,
+      token,
+      email,
+      role: dto.role,
+      member: null,
+    };
   }
 
   async acceptInvite(userId: string, userEmail: string, token: string) {
@@ -142,14 +202,16 @@ export class WorkspacesService {
       throw new NotFoundException('Invitation not found or expired');
     }
     if (invitation.email !== userEmail.toLowerCase().trim()) {
-      throw new BadRequestException('Invitation was issued to a different email');
+      throw new BadRequestException(
+        'Sign in with the invited email to accept this invite',
+      );
     }
     await this.assertMemberLimit(
       invitation.workspaceId,
       invitation.workspace.plan,
     );
 
-    return this.prisma.$transaction(async (tx) => {
+    const member = await this.prisma.$transaction(async (tx) => {
       await tx.workspaceInvitation.update({
         where: { id: invitation.id },
         data: { status: 'ACCEPTED', acceptedAt: new Date() },
@@ -169,6 +231,12 @@ export class WorkspacesService {
         },
       });
     });
+
+    return {
+      workspaceId: invitation.workspaceId,
+      workspaceName: invitation.workspace.name,
+      role: member.role,
+    };
   }
 
   async updateMemberRole(

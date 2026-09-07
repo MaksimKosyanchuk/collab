@@ -8,7 +8,8 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get(ACCESS_COOKIE)?.value;
   const isAuthPage =
     pathname.startsWith('/login') || pathname.startsWith('/register');
-  const isPrivate = pathname.startsWith('/app');
+  const isPrivate =
+    pathname.startsWith('/app') || pathname.startsWith('/invite');
   const isPublic =
     pathname.startsWith('/p/') || pathname.startsWith('/s/');
 
@@ -34,5 +35,11 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/app/:path*', '/s/:path*', '/login', '/register'],
+  matcher: [
+    '/app/:path*',
+    '/s/:path*',
+    '/invite',
+    '/login',
+    '/register',
+  ],
 };

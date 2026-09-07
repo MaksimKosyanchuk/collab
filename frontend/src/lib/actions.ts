@@ -17,6 +17,8 @@ import type {
   DocumentShare,
   DocumentTreeItem,
   Workspace,
+  WorkspaceMember,
+  WorkspaceRole,
 } from './types';
 
 const cookieOpts = {
@@ -199,5 +201,95 @@ export async function createPublicLinkAction(
     return { ok: true, data };
   } catch (error) {
     return actionError(error, 'Public link failed');
+  }
+}
+
+export async function inviteWorkspaceMemberAction(
+  workspaceId: string,
+  input: { email: string; role: Exclude<WorkspaceRole, 'OWNER'> },
+): Promise<
+  ActionResult<{
+    status: 'added' | 'invited';
+    email: string;
+    role: Exclude<WorkspaceRole, 'OWNER'>;
+    token: string | null;
+    member: WorkspaceMember | null;
+    id?: string;
+  }>
+> {
+  try {
+    const data = await serverApi<{
+      status: 'added' | 'invited';
+      email: string;
+      role: Exclude<WorkspaceRole, 'OWNER'>;
+      token: string | null;
+      member: WorkspaceMember | null;
+      id?: string;
+    }>(`/workspaces/${workspaceId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    revalidatePath(`/app/w/${workspaceId}`);
+    revalidatePath('/app');
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Invite failed');
+  }
+}
+
+export async function updateWorkspaceMemberRoleAction(
+  workspaceId: string,
+  memberUserId: string,
+  role: Exclude<WorkspaceRole, 'OWNER'>,
+): Promise<ActionResult<{ id: string; role: WorkspaceRole }>> {
+  try {
+    const data = await serverApi<{ id: string; role: WorkspaceRole }>(
+      `/workspaces/${workspaceId}/members/${memberUserId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      },
+    );
+    revalidatePath(`/app/w/${workspaceId}`);
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Role update failed');
+  }
+}
+
+export async function removeWorkspaceMemberAction(
+  workspaceId: string,
+  memberUserId: string,
+): Promise<ActionResult<{ removed: true }>> {
+  try {
+    await serverApi(`/workspaces/${workspaceId}/members/${memberUserId}`, {
+      method: 'DELETE',
+    });
+    revalidatePath(`/app/w/${workspaceId}`);
+    return { ok: true, data: { removed: true } };
+  } catch (error) {
+    return actionError(error, 'Remove failed');
+  }
+}
+
+export async function acceptWorkspaceInviteAction(
+  token: string,
+): Promise<
+  ActionResult<{ workspaceId: string; workspaceName: string; role: string }>
+> {
+  try {
+    const data = await serverApi<{
+      workspaceId: string;
+      workspaceName: string;
+      role: string;
+    }>('/workspaces/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+    revalidatePath('/app');
+    revalidatePath(`/app/w/${data.workspaceId}`);
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Accept invite failed');
   }
 }

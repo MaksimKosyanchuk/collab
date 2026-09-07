@@ -42,6 +42,22 @@ export type WorkspaceMember = {
   };
 };
 
+export type WorkspaceRole = WorkspaceMember['role'];
+
+export type WorkspaceInvitation = {
+  id: string;
+  email: string;
+  role: Exclude<WorkspaceRole, 'OWNER'>;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type WorkspaceDetail = Workspace & {
+  members: WorkspaceMember[];
+  invitations: WorkspaceInvitation[];
+  myRole: WorkspaceRole | null;
+};
+
 export type DocumentShare = {
   id: string;
   documentId: string;

@@ -36,6 +36,11 @@ export class WorkspacesController {
     return this.workspaces.listForUser(user.id);
   }
 
+  @Post('invitations/accept')
+  accept(@CurrentUser() user: AuthUser, @Body() dto: AcceptInviteDto) {
+    return this.workspaces.acceptInvite(user.id, user.email, dto.token);
+  }
+
   @Get(':workspaceId')
   get(
     @CurrentUser() user: AuthUser,
@@ -51,11 +56,6 @@ export class WorkspacesController {
     @Body() dto: InviteMemberDto,
   ) {
     return this.workspaces.invite(workspaceId, user.id, dto);
-  }
-
-  @Post('invitations/accept')
-  accept(@CurrentUser() user: AuthUser, @Body() dto: AcceptInviteDto) {
-    return this.workspaces.acceptInvite(user.id, user.email, dto.token);
   }
 
   @Patch(':workspaceId/members/:memberUserId')
