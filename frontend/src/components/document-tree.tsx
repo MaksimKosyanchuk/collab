@@ -3,6 +3,8 @@ import { createDocumentAction } from '@/lib/actions';
 import { DocumentTreeNav } from '@/components/document-tree-nav';
 import { WorkspaceBillingPanel } from '@/components/workspace-billing-panel';
 import { WorkspaceMembersPanel } from '@/components/workspace-members-panel';
+import { WorkspaceSearch } from '@/components/workspace-search';
+import { WorkspaceSettingsForm } from '@/components/workspace-settings-form';
 import type { DocumentTreeItem, WorkspaceDetail } from '@/lib/types';
 
 export function DocumentTree({
@@ -19,6 +21,8 @@ export function DocumentTree({
     workspace.myRole === 'OWNER' ||
     workspace.myRole === 'ADMIN' ||
     workspace.myRole === 'EDITOR';
+  const canManage =
+    workspace.myRole === 'OWNER' || workspace.myRole === 'ADMIN';
 
   return (
     <div className="mx-auto grid max-w-5xl gap-3 lg:grid-cols-[1fr_320px]">
@@ -38,6 +42,8 @@ export function DocumentTree({
             All
           </Link>
         </div>
+
+        <WorkspaceSearch workspaceId={workspace.id} />
 
         <DocumentTreeNav
           workspaceId={workspace.id}
@@ -88,6 +94,13 @@ export function DocumentTree({
           subscription={workspace.subscription}
           myRole={workspace.myRole}
         />
+
+        {canManage ? (
+          <WorkspaceSettingsForm
+            workspaceId={workspace.id}
+            name={workspace.name}
+          />
+        ) : null}
       </div>
     </div>
   );

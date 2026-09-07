@@ -11,11 +11,14 @@ import {
   serverApi,
 } from './api';
 import type {
+  AssetConfirm,
+  AssetPresign,
   AuthTokens,
   DocumentAccess,
   DocumentDetail,
   DocumentShare,
   DocumentTreeItem,
+  DocumentVersion,
   Workspace,
   WorkspaceMember,
   WorkspaceRole,
@@ -245,6 +248,27 @@ export async function inviteWorkspaceMemberAction(
     return { ok: true, data };
   } catch (error) {
     return actionError(error, 'Invite failed');
+  }
+}
+
+export async function renameWorkspaceAction(
+  workspaceId: string,
+  formData: FormData,
+): Promise<ActionResult<Workspace>> {
+  const name = String(formData.get('name') ?? '').trim();
+  if (name.length < 2) {
+    return { ok: false, error: 'Name must be at least 2 characters' };
+  }
+  try {
+    const data = await serverApi<Workspace>(`/workspaces/${workspaceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+    revalidatePath(`/app/w/${workspaceId}`);
+    revalidatePath('/app');
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Rename failed');
   }
 }
 
@@ -604,5 +628,92 @@ export async function markNotificationReadAction(
     return { ok: true, data: { ok: true } };
   } catch (error) {
     return actionError(error, 'Mark read failed');
+  }
+}
+
+export async function listVersionsAction(
+  documentId: string,
+): Promise<ActionResult<DocumentVersion[]>> {
+  try {
+    const data = await serverApi<DocumentVersion[]>(
+      `/documents/${documentId}/versions`,
+    );
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Failed to load versions');
+  }
+}
+
+export async function createSnapshotAction(
+  documentId: string,
+  workspaceId: string,
+): Promise<ActionResult<DocumentVersion>> {
+  try {
+    const data = await serverApi<DocumentVersion>(
+      `/documents/${documentId}/versions`,
+      { method: 'POST' },
+    );
+    revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Snapshot failed');
+  }
+}
+
+export async function restoreVersionAction(
+  documentId: string,
+  workspaceId: string,
+  versionId: string,
+): Promise<ActionResult<{ restored: string }>> {
+  try {
+    const data = await serverApi<{ restored: string }>(
+      `/documents/${documentId}/versions/${versionId}/restore`,
+      { method: 'POST' },
+    );
+    revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Restore failed');
+  }
+}
+
+export async function presignAssetAction(
+  workspaceId: string,
+  input: { mimeType: string; sizeBytes: number; documentId?: string },
+): Promise<ActionResult<AssetPresign>> {
+  try {
+    const data = await serverApi<AssetPresign>(
+      `/workspaces/${workspaceId}/assets/presign`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Upload prepare failed');
+  }
+}
+
+export async function confirmAssetAction(
+  workspaceId: string,
+  input: {
+    objectKey: string;
+    mimeType: string;
+    sizeBytes: number;
+    documentId?: string;
+  },
+): Promise<ActionResult<AssetConfirm>> {
+  try {
+    const data = await serverApi<AssetConfirm>(
+      `/workspaces/${workspaceId}/assets/confirm`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Upload confirm failed');
   }
 }

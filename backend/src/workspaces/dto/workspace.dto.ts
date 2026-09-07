@@ -1,9 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { WorkspaceRole } from '@prisma/client';
 import {
   IsEnum,
   IsIn,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -51,10 +50,9 @@ export class RespondInviteDto {
 }
 
 export class RenameWorkspaceDto {
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
   @MinLength(2)
   @MaxLength(80)
-  name?: string;
+  name: string;
 }

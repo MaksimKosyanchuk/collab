@@ -137,6 +137,28 @@ export type PublishedDocument = {
   updatedAt: string;
 };
 
+export type DocumentVersion = {
+  id: string;
+  title: string;
+  trigger: string;
+  createdAt: string;
+  createdById?: string | null;
+};
+
+export type AssetPresign = {
+  objectKey: string;
+  uploadUrl: string;
+  bucket: string;
+};
+
+export type AssetConfirm = {
+  id: string;
+  objectKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+};
+
 export type ApiErrorBody = {
   statusCode?: number;
   message?: string | string[];

@@ -117,18 +117,28 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
     ydoc.on('update', refreshLocal);
 
     async function connect() {
+      if (cancelled || deletedRef.current) return;
       setConn('connecting');
       let accessToken: string | null = null;
-      const tokenRes = await fetch('/api/auth/ws-token', { cache: 'no-store' });
-      if (tokenRes.ok) {
-        const body = (await tokenRes.json()) as { accessToken: string };
-        accessToken = body.accessToken;
+      try {
+        const tokenRes = await fetch('/api/auth/ws-token', {
+          cache: 'no-store',
+        });
+        if (tokenRes.ok) {
+          const body = (await tokenRes.json()) as { accessToken: string };
+          accessToken = body.accessToken;
+        }
+      } catch {
+        // Fall through — may still join with shareToken.
       }
       if (!accessToken && !shareToken) {
-        if (!cancelled) setConn('offline');
+        if (!cancelled && !deletedRef.current) {
+          setConn('offline');
+          scheduleReconnect();
+        }
         return;
       }
-      if (cancelled) return;
+      if (cancelled || deletedRef.current) return;
 
       const url = new URL(wsBase());
       url.searchParams.set('documentId', documentId);
@@ -145,7 +155,9 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
         if (!cancelled && !deletedRef.current) setConn('online');
       };
       socket.onclose = () => {
-        if (!cancelled && !deletedRef.current) setConn('offline');
+        if (cancelled || deletedRef.current) return;
+        setConn('offline');
+        scheduleReconnect();
       };
       socket.onerror = () => {
         if (!cancelled && !deletedRef.current) setConn('offline');
@@ -195,10 +207,37 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
       };
     }
 
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleReconnect() {
+      if (cancelled || deletedRef.current || reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        if (cancelled || deletedRef.current) return;
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          scheduleReconnect();
+          return;
+        }
+        void connect();
+      }, 1500);
+    }
+
     void connect();
+
+    const onOnline = () => {
+      if (cancelled || deletedRef.current) return;
+      if (socketRef.current?.readyState === WebSocket.OPEN) return;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      void connect();
+    };
+    window.addEventListener('online', onOnline);
 
     return () => {
       cancelled = true;
+      window.removeEventListener('online', onOnline);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       ydoc.off('update', onDocUpdate);
       ydoc.off('update', refreshLocal);
       socketRef.current?.close();

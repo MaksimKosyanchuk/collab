@@ -16,6 +16,7 @@ import {
   AcceptInviteDto,
   CreateWorkspaceDto,
   InviteMemberDto,
+  RenameWorkspaceDto,
   RespondInviteDto,
   UpdateMemberRoleDto,
 } from './dto/workspace.dto';
@@ -58,6 +59,15 @@ export class WorkspacesController {
     @Param('workspaceId') workspaceId: string,
   ) {
     return this.workspaces.get(workspaceId, user.id);
+  }
+
+  @Patch(':workspaceId')
+  rename(
+    @CurrentUser() user: AuthUser,
+    @Param('workspaceId') workspaceId: string,
+    @Body() dto: RenameWorkspaceDto,
+  ) {
+    return this.workspaces.rename(workspaceId, user.id, dto.name);
   }
 
   @Post(':workspaceId/invitations')

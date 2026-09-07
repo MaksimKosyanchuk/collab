@@ -100,6 +100,19 @@ export class WorkspacesService {
     };
   }
 
+  async rename(workspaceId: string, userId: string, name: string) {
+    await this.access.assertWorkspaceManage(workspaceId, userId);
+    const trimmed = name.trim();
+    if (trimmed.length < 2) {
+      throw new BadRequestException('Name must be at least 2 characters');
+    }
+    const workspace = await this.prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { name: trimmed },
+    });
+    return toWorkspaceDto(workspace);
+  }
+
   async invite(workspaceId: string, userId: string, dto: InviteMemberDto) {
     await this.access.assertWorkspaceManage(workspaceId, userId);
     if (dto.role === WorkspaceRole.OWNER) {

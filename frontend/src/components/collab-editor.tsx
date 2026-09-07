@@ -1,11 +1,116 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { DocumentAccessPanel } from '@/components/document-access-panel';
 import { BlockComments } from '@/components/block-comments';
+import { VersionHistoryPanel } from '@/components/version-history-panel';
+import { useToast } from '@/components/toast-provider';
+import { confirmAssetAction, presignAssetAction } from '@/lib/actions';
 import { BLOCK_TYPES, type BlockType } from '@/lib/blocks';
+import { connectionStatusLabel, messageFromUnknown } from '@/lib/errors';
 import { useCollabDoc } from '@/hooks/use-collab-doc';
 import type { DocumentDetail, WorkspaceMember } from '@/lib/types';
+
+async function uploadImageFile(
+  workspaceId: string,
+  documentId: string,
+  file: File,
+): Promise<string> {
+  const presign = await presignAssetAction(workspaceId, {
+    mimeType: file.type || 'image/png',
+    sizeBytes: file.size,
+    documentId,
+  });
+  if (!presign.ok) {
+    throw new Error(presign.error);
+  }
+
+  const put = await fetch(presign.data.uploadUrl, {
+    method: 'PUT',
+    body: file,
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+  });
+  if (!put.ok) {
+    throw new Error('Upload to storage failed');
+  }
+
+  const confirmed = await confirmAssetAction(workspaceId, {
+    objectKey: presign.data.objectKey,
+    mimeType: file.type || 'image/png',
+    sizeBytes: file.size,
+    documentId,
+  });
+  if (!confirmed.ok) {
+    throw new Error(confirmed.error);
+  }
+  return confirmed.data.url;
+}
+
+function ImageBlockFields({
+  workspaceId,
+  documentId,
+  src,
+  text,
+  canUpload,
+  onSrcChange,
+}: {
+  workspaceId: string;
+  documentId: string;
+  src?: string;
+  text: string;
+  canUpload: boolean;
+  onSrcChange: (src: string) => void;
+}) {
+  const { show } = useToast();
+  const [uploading, setUploading] = useState(false);
+
+  async function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !canUpload) return;
+    setUploading(true);
+    try {
+      const url = await uploadImageFile(workspaceId, documentId, file);
+      onSrcChange(url);
+      show('Image uploaded', 'success');
+    } catch (error) {
+      show(messageFromUnknown(error, 'Upload failed'), 'error');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        className="field"
+        placeholder="Image URL"
+        value={src ?? ''}
+        disabled={!canUpload}
+        onChange={(event) => onSrcChange(event.target.value)}
+      />
+      {canUpload ? (
+        <label className="btn btn-ghost inline-flex cursor-pointer items-center">
+          {uploading ? 'Uploading…' : 'Upload'}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            disabled={uploading}
+            onChange={onFileChange}
+          />
+        </label>
+      ) : null}
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={text || ''} className="max-h-64 rounded-md" />
+      ) : null}
+    </div>
+  );
+}
 
 export function CollabEditor({
   workspaceId,
@@ -64,13 +169,14 @@ export function CollabEditor({
     );
   }
 
-  const statusLabel = !browserOnline
-    ? 'Offline'
-    : conn === 'online'
-      ? 'Live'
-      : conn === 'connecting'
-        ? 'Connecting…'
-        : 'Reconnecting…';
+  const status = connectionStatusLabel({ conn, browserOnline });
+  const editable = canEdit && conn === 'online' && browserOnline;
+  const statusClass =
+    status.tone === 'warn'
+      ? 'text-sm font-medium text-[#a16207]'
+      : status.tone === 'muted'
+        ? 'text-sm font-medium text-muted'
+        : 'text-sm font-medium';
 
   return (
     <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
@@ -85,7 +191,7 @@ export function CollabEditor({
           <p className="text-[11px] uppercase tracking-wide text-muted">
             Status
           </p>
-          <p className="text-sm font-medium">{statusLabel}</p>
+          <p className={statusClass}>{status.label}</p>
           {!canEdit && conn === 'online' ? (
             <p className="mt-0.5 text-[12px] text-muted">View only</p>
           ) : null}
@@ -113,6 +219,11 @@ export function CollabEditor({
             </ul>
           )}
         </div>
+        <VersionHistoryPanel
+          documentId={documentId}
+          workspaceId={workspaceId}
+          canEdit={canEdit}
+        />
         {showAccessPanel ? (
           <DocumentAccessPanel
             workspaceId={workspaceId}
@@ -131,7 +242,7 @@ export function CollabEditor({
         <input
           className="w-full border-0 bg-transparent text-xl font-semibold tracking-tight outline-none placeholder:text-neutral-400"
           value={title}
-          disabled={!canEdit || conn !== 'online'}
+          disabled={!editable}
           onChange={(event) => updateTitle(event.target.value)}
           placeholder="Untitled"
         />
@@ -160,7 +271,7 @@ export function CollabEditor({
                       type="checkbox"
                       className="mt-1.5"
                       checked={!!block.checked}
-                      disabled={!canEdit || conn !== 'online'}
+                      disabled={!editable}
                       onChange={(event) =>
                         updateBlock(block.id, {
                           checked: event.target.checked,
@@ -170,7 +281,7 @@ export function CollabEditor({
                     <textarea
                       className="field min-h-[2.25rem] resize-y"
                       value={block.text}
-                      disabled={!canEdit || conn !== 'online'}
+                      disabled={!editable}
                       onChange={(event) =>
                         updateBlock(block.id, { text: event.target.value })
                       }
@@ -183,30 +294,21 @@ export function CollabEditor({
                     />
                   </label>
                 ) : block.type === 'image' ? (
-                  <div className="space-y-2">
-                    <input
-                      className="field"
-                      placeholder="Image URL"
-                      value={block.src ?? ''}
-                      disabled={!canEdit || conn !== 'online'}
-                      onChange={(event) =>
-                        updateBlock(block.id, { src: event.target.value })
-                      }
-                    />
-                    {block.src ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={block.src}
-                        alt={block.text || ''}
-                        className="max-h-64 rounded-md"
-                      />
-                    ) : null}
-                  </div>
+                  <ImageBlockFields
+                    workspaceId={workspaceId}
+                    documentId={documentId}
+                    src={block.src}
+                    text={block.text}
+                    canUpload={editable}
+                    onSrcChange={(next) =>
+                      updateBlock(block.id, { src: next })
+                    }
+                  />
                 ) : block.type === 'list' ? (
                   <textarea
                     className="field min-h-[4rem] resize-y font-mono text-[13px]"
                     value={(block.items ?? ['']).join('\n')}
-                    disabled={!canEdit || conn !== 'online'}
+                    disabled={!editable}
                     placeholder="One item per line"
                     onChange={(event) =>
                       updateBlock(block.id, {
@@ -231,7 +333,7 @@ export function CollabEditor({
                           : 'min-h-[2.75rem]'
                     }`}
                     value={block.text}
-                    disabled={!canEdit || conn !== 'online'}
+                    disabled={!editable}
                     onChange={(event) =>
                       updateBlock(block.id, { text: event.target.value })
                     }
@@ -244,7 +346,7 @@ export function CollabEditor({
                   />
                 )}
 
-                {canEdit && conn === 'online' ? (
+                {editable ? (
                   <div className="mt-1 flex flex-wrap gap-2 opacity-0 transition group-hover:opacity-100">
                     <span className="text-[11px] uppercase tracking-wide text-muted">
                       {block.type}
@@ -261,7 +363,7 @@ export function CollabEditor({
                 <BlockComments
                   documentId={documentId}
                   blockId={block.id}
-                  canComment={canEdit && conn === 'online'}
+                  canComment={editable}
                   mentionHints={members.map(
                     (member) => member.user.displayName,
                   )}
@@ -271,7 +373,7 @@ export function CollabEditor({
           )}
         </div>
 
-        {canEdit && conn === 'online' ? (
+        {editable ? (
           <div className="mt-5 flex flex-wrap gap-1.5 border-t border-line pt-3">
             {BLOCK_TYPES.map((type) => (
               <button
