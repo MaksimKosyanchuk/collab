@@ -16,6 +16,7 @@ import {
   AcceptInviteDto,
   CreateWorkspaceDto,
   InviteMemberDto,
+  RespondInviteDto,
   UpdateMemberRoleDto,
 } from './dto/workspace.dto';
 
@@ -39,6 +40,16 @@ export class WorkspacesController {
   @Post('invitations/accept')
   accept(@CurrentUser() user: AuthUser, @Body() dto: AcceptInviteDto) {
     return this.workspaces.acceptInvite(user.id, user.email, dto.token);
+  }
+
+  @Post('invitations/respond')
+  respond(@CurrentUser() user: AuthUser, @Body() dto: RespondInviteDto) {
+    return this.workspaces.respondInvite(
+      user.id,
+      user.email,
+      dto.invitationId,
+      dto.action,
+    );
   }
 
   @Get(':workspaceId')

@@ -7,7 +7,7 @@ import { PlanTier, PublicationStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import sanitizeHtml from 'sanitize-html';
 import { AccessService, AccessContext, hashToken } from '../access/access.service';
-import { canEdit } from '../access/access.policy';
+import { canEdit, canManage, documentAccessToLevel, workspaceRoleToAccess } from '../access/access.policy';
 import { CollabPersistenceService } from '../collab/collab-persistence.service';
 import { CollabRoomsService } from '../collab/collab-rooms.service';
 import { PlanLimitException } from '../common/exceptions/plan-limit.exception';
@@ -111,36 +111,60 @@ export class DocumentsService {
       documentId,
       ctx,
     );
-    const [projection, shares, publicLinks] = await Promise.all([
-      this.prisma.documentProjection.findUnique({
-        where: { documentId },
-      }),
-      this.prisma.documentShare.findMany({
-        where: { documentId },
-        include: {
-          user: {
-            select: { id: true, email: true, displayName: true },
-          },
-        },
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.documentPublicLink.findMany({
-        where: { documentId, revokedAt: null },
-        select: {
-          id: true,
-          tokenPrefix: true,
-          access: true,
-          expiresAt: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+    const canManageDoc = canManage(level);
+    const [projection, shares, shareInvitations, publicLinks] =
+      await Promise.all([
+        this.prisma.documentProjection.findUnique({
+          where: { documentId },
+        }),
+        canManageDoc
+          ? this.prisma.documentShare.findMany({
+              where: { documentId },
+              include: {
+                user: {
+                  select: { id: true, email: true, displayName: true },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            })
+          : Promise.resolve([]),
+        canManageDoc
+          ? this.prisma.documentShareInvitation.findMany({
+              where: {
+                documentId,
+                status: 'PENDING',
+                expiresAt: { gt: new Date() },
+              },
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                email: true,
+                access: true,
+                expiresAt: true,
+                createdAt: true,
+              },
+            })
+          : Promise.resolve([]),
+        canManageDoc
+          ? this.prisma.documentPublicLink.findMany({
+              where: { documentId, revokedAt: null },
+              select: {
+                id: true,
+                tokenPrefix: true,
+                access: true,
+                expiresAt: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            })
+          : Promise.resolve([]),
+      ]);
     return {
       ...document,
       access: level,
       projection,
       shares,
+      shareInvitations,
       publicLinks,
     };
   }
@@ -326,41 +350,196 @@ export class DocumentsService {
   }
 
   async share(documentId: string, ctx: AccessContext, dto: ShareDocumentDto) {
-    await this.access.assertDocumentManage(documentId, ctx);
+    const { document } = await this.access.assertDocumentManage(documentId, ctx);
     if (dto.access === 'MANAGE') {
       throw new BadRequestException('MANAGE is reserved for workspace admins');
     }
-    let userId = dto.userId;
-    if (!userId && dto.email) {
-      const user = await this.prisma.user.findUnique({
-        where: { email: dto.email.toLowerCase().trim() },
-      });
-      if (!user) {
-        throw new NotFoundException('User with this email is not registered');
-      }
-      userId = user.id;
+    const email = dto.email.toLowerCase().trim();
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, displayName: true },
+    });
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
     }
-    if (!userId) {
-      throw new BadRequestException('userId or email is required');
-    }
-    const share = await this.prisma.documentShare.upsert({
+
+    const member = await this.prisma.workspaceMember.findUnique({
       where: {
-        documentId_userId: { documentId, userId },
-      },
-      update: { access: dto.access },
-      create: {
-        documentId,
-        userId,
-        access: dto.access,
-      },
-      include: {
-        user: {
-          select: { id: true, email: true, displayName: true },
+        workspaceId_userId: {
+          workspaceId: document.workspaceId,
+          userId: existingUser.id,
         },
       },
     });
-    await this.rooms.revalidateUserOnDocument(documentId, userId);
-    return share;
+    if (member) {
+      const memberLevel = workspaceRoleToAccess(member.role);
+      const invitedLevel = documentAccessToLevel(dto.access);
+      if (invitedLevel <= memberLevel) {
+        throw new BadRequestException(
+          'User already has equal or higher access via workspace role',
+        );
+      }
+    }
+
+    const existingShare = await this.prisma.documentShare.findUnique({
+      where: {
+        documentId_userId: { documentId, userId: existingUser.id },
+      },
+    });
+    if (existingShare) {
+      const shareLevel = documentAccessToLevel(existingShare.access);
+      const invitedLevel = documentAccessToLevel(dto.access);
+      if (invitedLevel <= shareLevel) {
+        throw new BadRequestException(
+          'User already has equal or higher access to this page',
+        );
+      }
+    }
+
+    const pending = await this.prisma.documentShareInvitation.findFirst({
+      where: { documentId, email, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (pending) {
+      if (pending.expiresAt > new Date()) {
+        throw new BadRequestException(
+          'Share invitation already pending for this email',
+        );
+      }
+      await this.prisma.documentShareInvitation.update({
+        where: { id: pending.id },
+        data: { status: 'REVOKED' },
+      });
+    }
+
+    const inviter = ctx.userId
+      ? await this.prisma.user.findUnique({
+          where: { id: ctx.userId },
+          select: { displayName: true },
+        })
+      : null;
+    const workspace = await this.prisma.workspace.findUniqueOrThrow({
+      where: { id: document.workspaceId },
+      select: { name: true },
+    });
+
+    const invitation = await this.prisma.documentShareInvitation.create({
+      data: {
+        documentId,
+        email,
+        access: dto.access,
+        invitedById: ctx.userId!,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await this.outbox.enqueue({
+      type: 'notification.document_share',
+      aggregateType: 'document',
+      aggregateId: documentId,
+      idempotencyKey: `doc-share:${invitation.id}`,
+      payload: {
+        invitationId: invitation.id,
+        userId: existingUser.id,
+        email,
+        access: dto.access,
+        documentId,
+        documentTitle: document.title,
+        workspaceId: document.workspaceId,
+        workspaceName: workspace.name,
+        invitedByName: inviter?.displayName ?? 'Someone',
+      },
+    });
+
+    return {
+      status: 'invited' as const,
+      id: invitation.id,
+      email,
+      access: dto.access,
+      displayName: existingUser.displayName,
+      expiresAt: invitation.expiresAt,
+    };
+  }
+
+  async respondShareInvite(
+    userId: string,
+    userEmail: string,
+    invitationId: string,
+    action: 'accept' | 'decline',
+  ) {
+    const invitation = await this.prisma.documentShareInvitation.findUnique({
+      where: { id: invitationId },
+      include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            workspaceId: true,
+            deletedAt: true,
+          },
+        },
+      },
+    });
+    if (
+      !invitation ||
+      invitation.status !== 'PENDING' ||
+      invitation.expiresAt < new Date() ||
+      invitation.document.deletedAt
+    ) {
+      throw new NotFoundException('Share invitation not found or expired');
+    }
+    if (invitation.email !== userEmail.toLowerCase().trim()) {
+      throw new BadRequestException(
+        'Sign in with the invited email to respond to this share',
+      );
+    }
+
+    if (action === 'decline') {
+      await this.prisma.documentShareInvitation.update({
+        where: { id: invitation.id },
+        data: { status: 'DECLINED' },
+      });
+      return {
+        status: 'declined' as const,
+        documentId: invitation.documentId,
+        workspaceId: invitation.document.workspaceId,
+      };
+    }
+
+    const share = await this.prisma.$transaction(async (tx) => {
+      await tx.documentShareInvitation.update({
+        where: { id: invitation.id },
+        data: { status: 'ACCEPTED', acceptedAt: new Date() },
+      });
+      return tx.documentShare.upsert({
+        where: {
+          documentId_userId: {
+            documentId: invitation.documentId,
+            userId,
+          },
+        },
+        update: { access: invitation.access },
+        create: {
+          documentId: invitation.documentId,
+          userId,
+          access: invitation.access,
+        },
+        include: {
+          user: {
+            select: { id: true, email: true, displayName: true },
+          },
+        },
+      });
+    });
+
+    await this.rooms.revalidateUserOnDocument(invitation.documentId, userId);
+    return {
+      status: 'accepted' as const,
+      documentId: invitation.documentId,
+      workspaceId: invitation.document.workspaceId,
+      documentTitle: invitation.document.title,
+      access: share.access,
+    };
   }
 
   async unshare(
@@ -374,6 +553,37 @@ export class DocumentsService {
     });
     await this.rooms.revalidateUserOnDocument(documentId, shareUserId);
     return { removed: true };
+  }
+
+  async updateShareAccess(
+    documentId: string,
+    ctx: AccessContext,
+    shareUserId: string,
+    access: 'VIEW' | 'EDIT' | 'MANAGE',
+  ) {
+    await this.access.assertDocumentManage(documentId, ctx);
+    if (access === 'MANAGE') {
+      throw new BadRequestException('MANAGE is reserved for workspace admins');
+    }
+    const existing = await this.prisma.documentShare.findUnique({
+      where: {
+        documentId_userId: { documentId, userId: shareUserId },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Share not found');
+    }
+    const share = await this.prisma.documentShare.update({
+      where: { id: existing.id },
+      data: { access },
+      include: {
+        user: {
+          select: { id: true, email: true, displayName: true },
+        },
+      },
+    });
+    await this.rooms.revalidateUserOnDocument(documentId, shareUserId);
+    return share;
   }
 
   async createPublicLink(

@@ -21,6 +21,7 @@ import {
   MoveDocumentDto,
   PublishDocumentDto,
   RenameDocumentDto,
+  RespondDocumentShareDto,
   ShareDocumentDto,
 } from './dto/document.dto';
 
@@ -49,6 +50,21 @@ export class DocumentsController {
   @Get('documents/shared')
   listSharedWithMe(@CurrentUser() user: AuthUser) {
     return this.documents.listSharedWithMe(user.id);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Post('documents/share-invitations/respond')
+  respondShareInvite(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: RespondDocumentShareDto,
+  ) {
+    return this.documents.respondShareInvite(
+      user.id,
+      user.email,
+      dto.invitationId,
+      dto.action,
+    );
   }
 
   @ApiBearerAuth('JWT-auth')
@@ -135,6 +151,23 @@ export class DocumentsController {
     @Body() dto: ShareDocumentDto,
   ) {
     return this.documents.share(documentId, { userId: user.id }, dto);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Patch('documents/:documentId/shares/:shareUserId')
+  updateShare(
+    @CurrentUser() user: AuthUser,
+    @Param('documentId') documentId: string,
+    @Param('shareUserId') shareUserId: string,
+    @Body() dto: CreatePublicLinkDto,
+  ) {
+    return this.documents.updateShareAccess(
+      documentId,
+      { userId: user.id },
+      shareUserId,
+      dto.access,
+    );
   }
 
   @ApiBearerAuth('JWT-auth')

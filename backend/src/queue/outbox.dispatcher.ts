@@ -41,7 +41,8 @@ export class OutboxDispatcher implements OnModuleInit, OnModuleDestroy {
         continue;
       }
       try {
-        const jobId = event.idempotencyKey;
+        // BullMQ custom job ids cannot contain ":".
+        const jobId = event.idempotencyKey.replace(/:/g, '_');
         if (event.type.startsWith('search.')) {
           await this.searchQueue.add(
             event.type,
@@ -53,6 +54,7 @@ export class OutboxDispatcher implements OnModuleInit, OnModuleDestroy {
         } else if (event.type.startsWith('notification.')) {
           await this.notificationsQueue.add(event.type, event.payload, {
             jobId,
+            removeOnComplete: true,
           });
         }
         await this.prisma.outboxEvent.update({

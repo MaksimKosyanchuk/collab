@@ -47,6 +47,7 @@ enum PublicationStatus {
 enum InvitationStatus {
   PENDING
   ACCEPTED
+  DECLINED
   REVOKED
 }
 
@@ -83,6 +84,7 @@ model User {
   ownedWorkspaces     Workspace[]          @relation("WorkspaceOwner")
   memberships         WorkspaceMember[]
   invitationsSent     WorkspaceInvitation[] @relation("InvitationInviter")
+  documentShareInvitesSent DocumentShareInvitation[] @relation("DocumentShareInviter")
   documentsCreated    Document[]           @relation("DocumentCreator")
   documentShares      DocumentShare[]
   publicLinksCreated  DocumentPublicLink[] @relation("PublicLinkCreator")
@@ -185,6 +187,7 @@ model Document {
   children    Document[]           @relation("DocumentTree")
   createdBy   User                 @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
   shares      DocumentShare[]
+  shareInvitations DocumentShareInvitation[]
   publicLinks DocumentPublicLink[]
   collabState DocumentCollabState?
   collabUpdates DocumentCollabUpdate[]
@@ -213,6 +216,24 @@ model DocumentShare {
   @@unique([documentId, userId])
   @@index([userId])
   @@index([documentId])
+}
+
+model DocumentShareInvitation {
+  id          String           @id @default(uuid())
+  documentId  String
+  email       String
+  access      DocumentAccess
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  invitedBy User     @relation("DocumentShareInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([documentId, email, status])
+  @@index([email, status])
 }
 
 model DocumentPublicLink {

@@ -25,7 +25,7 @@ export default async function WorkspacePage({ params }: Props) {
     );
   } catch (error) {
     return (
-      <div className="panel rounded-2xl p-6">
+      <div className="panel p-4">
         <p className="error">
           {error instanceof Error ? error.message : 'Workspace unavailable'}
         </p>

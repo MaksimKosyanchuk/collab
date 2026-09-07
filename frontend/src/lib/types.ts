@@ -91,6 +91,14 @@ export type DocumentShare = {
   };
 };
 
+export type DocumentShareInvitation = {
+  id: string;
+  email: string;
+  access: DocumentAccess;
+  expiresAt: string;
+  createdAt: string;
+};
+
 export type DocumentPublicLinkMeta = {
   id: string;
   tokenPrefix: string;
@@ -108,6 +116,7 @@ export type DocumentDetail = {
   publishedAt: string | null;
   access: number;
   shares: DocumentShare[];
+  shareInvitations?: DocumentShareInvitation[];
   publicLinks: DocumentPublicLinkMeta[];
 };
 

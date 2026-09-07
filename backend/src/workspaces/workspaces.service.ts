@@ -108,61 +108,53 @@ export class WorkspacesService {
     const email = dto.email.toLowerCase().trim();
     const workspace = await this.prisma.workspace.findUniqueOrThrow({
       where: { id: workspaceId },
+      include: {
+        members: {
+          where: { userId },
+          include: {
+            user: { select: { displayName: true } },
+          },
+          take: 1,
+        },
+      },
     });
     await this.assertMemberLimit(workspace.id, workspace.plan);
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
+      select: { id: true, email: true, displayName: true },
     });
-    if (existingUser) {
-      const member = await this.prisma.workspaceMember.findUnique({
-        where: {
-          workspaceId_userId: { workspaceId, userId: existingUser.id },
-        },
-      });
-      if (member) {
-        throw new BadRequestException('User is already a member');
-      }
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
+    }
 
-      const added = await this.prisma.workspaceMember.create({
-        data: {
-          workspaceId,
-          userId: existingUser.id,
-          role: dto.role,
-        },
-        include: {
-          user: {
-            select: { id: true, email: true, displayName: true },
-          },
-        },
-      });
-      await this.outbox.enqueue({
-        type: 'notification.invite',
-        aggregateType: 'workspace',
-        aggregateId: workspaceId,
-        idempotencyKey: `invite-add:${workspaceId}:${existingUser.id}:${Date.now()}`,
-        payload: {
-          email,
-          role: dto.role,
-          addedDirectly: true,
-        },
-      });
-      return {
-        status: 'added' as const,
-        email,
-        role: dto.role,
-        member: added,
-        token: null,
-      };
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: { workspaceId, userId: existingUser.id },
+      },
+    });
+    if (member) {
+      throw new BadRequestException('User is already a member');
     }
 
     const pending = await this.prisma.workspaceInvitation.findFirst({
       where: { workspaceId, email, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
     });
-    if (pending && pending.expiresAt > new Date()) {
-      throw new BadRequestException('Invitation already pending for this email');
+    if (pending) {
+      if (pending.expiresAt > new Date()) {
+        throw new BadRequestException(
+          'Invitation already pending for this email',
+        );
+      }
+      await this.prisma.workspaceInvitation.update({
+        where: { id: pending.id },
+        data: { status: 'REVOKED' },
+      });
     }
 
+    const inviterName =
+      workspace.members[0]?.user.displayName ?? 'A workspace admin';
     const token = randomBytes(24).toString('base64url');
     const invitation = await this.prisma.workspaceInvitation.create({
       data: {
@@ -174,20 +166,28 @@ export class WorkspacesService {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
+
     await this.outbox.enqueue({
       type: 'notification.invite',
       aggregateType: 'workspace',
       aggregateId: workspaceId,
       idempotencyKey: `invite:${invitation.id}`,
-      payload: { invitationId: invitation.id, email },
+      payload: {
+        invitationId: invitation.id,
+        userId: existingUser.id,
+        email,
+        role: dto.role,
+        workspaceId,
+        workspaceName: workspace.name,
+        invitedByName: inviterName,
+      },
     });
     return {
       status: 'invited' as const,
       id: invitation.id,
-      token,
       email,
       role: dto.role,
-      member: null,
+      displayName: existingUser.displayName,
     };
   }
 
@@ -196,6 +196,38 @@ export class WorkspacesService {
       where: { tokenHash: hashToken(token) },
       include: { workspace: true },
     });
+    return this.acceptInvitationRecord(userId, userEmail, invitation);
+  }
+
+  async respondInvite(
+    userId: string,
+    userEmail: string,
+    invitationId: string,
+    action: 'accept' | 'decline',
+  ) {
+    const invitation = await this.prisma.workspaceInvitation.findUnique({
+      where: { id: invitationId },
+      include: { workspace: true },
+    });
+    if (action === 'decline') {
+      return this.declineInvitationRecord(userId, userEmail, invitation);
+    }
+    return this.acceptInvitationRecord(userId, userEmail, invitation);
+  }
+
+  private async acceptInvitationRecord(
+    userId: string,
+    userEmail: string,
+    invitation: {
+      id: string;
+      email: string;
+      role: WorkspaceRole;
+      status: string;
+      expiresAt: Date;
+      workspaceId: string;
+      workspace: { name: string; plan: PlanTier };
+    } | null,
+  ) {
     if (
       !invitation ||
       invitation.status !== 'PENDING' ||
@@ -235,9 +267,45 @@ export class WorkspacesService {
     });
 
     return {
+      status: 'accepted' as const,
       workspaceId: invitation.workspaceId,
       workspaceName: invitation.workspace.name,
       role: member.role,
+    };
+  }
+
+  private async declineInvitationRecord(
+    _userId: string,
+    userEmail: string,
+    invitation: {
+      id: string;
+      email: string;
+      status: string;
+      expiresAt: Date;
+      workspaceId: string;
+      workspace: { name: string };
+    } | null,
+  ) {
+    if (
+      !invitation ||
+      invitation.status !== 'PENDING' ||
+      invitation.expiresAt < new Date()
+    ) {
+      throw new NotFoundException('Invitation not found or expired');
+    }
+    if (invitation.email !== userEmail.toLowerCase().trim()) {
+      throw new BadRequestException(
+        'Sign in with the invited email to decline this invite',
+      );
+    }
+    await this.prisma.workspaceInvitation.update({
+      where: { id: invitation.id },
+      data: { status: 'DECLINED' },
+    });
+    return {
+      status: 'declined' as const,
+      workspaceId: invitation.workspaceId,
+      workspaceName: invitation.workspace.name,
     };
   }
 

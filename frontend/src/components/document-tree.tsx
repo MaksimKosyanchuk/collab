@@ -21,31 +21,31 @@ export function DocumentTree({
     workspace.myRole === 'EDITOR';
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-      <div className="space-y-3">
-        <section className="panel p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide text-muted">
-                Workspace
-              </p>
-              <h1 className="truncate text-sm font-semibold">{workspace.name}</h1>
-              <p className="mt-0.5 text-[12px] text-muted">
-                {workspace.plan}
-                {workspace.myRole ? ` · ${workspace.myRole}` : ''}
-              </p>
-            </div>
-            <Link href="/app" className="btn btn-ghost shrink-0">
-              All
-            </Link>
+    <div className="mx-auto grid max-w-5xl gap-3 lg:grid-cols-[1fr_320px]">
+      <section className="panel p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wide text-muted">
+              Workspace
+            </p>
+            <h1 className="truncate text-sm font-semibold">{workspace.name}</h1>
+            <p className="mt-0.5 text-[12px] text-muted">
+              {workspace.plan}
+              {workspace.myRole ? ` · ${workspace.myRole}` : ''}
+            </p>
           </div>
+          <Link href="/app" className="btn btn-ghost shrink-0">
+            All
+          </Link>
+        </div>
 
-          <DocumentTreeNav
-            workspaceId={workspace.id}
-            documents={documents}
-            canEdit={canEditTree}
-          />
+        <DocumentTreeNav
+          workspaceId={workspace.id}
+          documents={documents}
+          canEdit={canEditTree}
+        />
 
+        {canEditTree ? (
           <form
             action={create}
             className="mt-3 space-y-2 border-t border-line pt-3"
@@ -57,12 +57,22 @@ export function DocumentTree({
               placeholder="Untitled"
               maxLength={200}
             />
+            <select className="field" name="parentId" defaultValue="">
+              <option value="">Top level</option>
+              {documents.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  Nest under: {doc.title}
+                </option>
+              ))}
+            </select>
             <button className="btn btn-primary w-full" type="submit">
               Create
             </button>
           </form>
-        </section>
+        ) : null}
+      </section>
 
+      <div className="space-y-3">
         <WorkspaceMembersPanel
           workspaceId={workspace.id}
           members={workspace.members}
@@ -79,15 +89,6 @@ export function DocumentTree({
           myRole={workspace.myRole}
         />
       </div>
-
-      <section className="panel flex min-h-64 items-center justify-center p-6 text-center">
-        <div>
-          <p className="text-sm font-medium">Select a page</p>
-          <p className="mt-1 max-w-xs text-[13px] text-muted">
-            Open a document from the tree to edit in real time.
-          </p>
-        </div>
-      </section>
     </div>
   );
 }

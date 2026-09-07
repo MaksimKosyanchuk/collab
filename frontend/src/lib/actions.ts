@@ -158,20 +158,33 @@ export async function publishDocumentAction(
 export async function shareDocumentAction(
   documentId: string,
   workspaceId: string,
-  input: { userId?: string; email?: string; access: DocumentAccess },
-): Promise<ActionResult<DocumentShare>> {
+  input: { email: string; access: DocumentAccess },
+): Promise<
+  ActionResult<{
+    status: 'invited';
+    id: string;
+    email: string;
+    access: DocumentAccess;
+    displayName: string;
+    expiresAt: string;
+  }>
+> {
   try {
-    const data = await serverApi<DocumentShare>(
-      `/documents/${documentId}/shares`,
-      {
-        method: 'POST',
-        body: JSON.stringify(input),
-      },
-    );
+    const data = await serverApi<{
+      status: 'invited';
+      id: string;
+      email: string;
+      access: DocumentAccess;
+      displayName: string;
+      expiresAt: string;
+    }>(`/documents/${documentId}/shares`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
     revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
     return { ok: true, data };
   } catch (error) {
-    return actionError(error, 'Share failed');
+    return actionError(error, 'Share invite failed');
   }
 }
 
@@ -209,22 +222,20 @@ export async function inviteWorkspaceMemberAction(
   input: { email: string; role: Exclude<WorkspaceRole, 'OWNER'> },
 ): Promise<
   ActionResult<{
-    status: 'added' | 'invited';
+    status: 'invited';
     email: string;
     role: Exclude<WorkspaceRole, 'OWNER'>;
-    token: string | null;
-    member: WorkspaceMember | null;
-    id?: string;
+    displayName: string;
+    id: string;
   }>
 > {
   try {
     const data = await serverApi<{
-      status: 'added' | 'invited';
+      status: 'invited';
       email: string;
       role: Exclude<WorkspaceRole, 'OWNER'>;
-      token: string | null;
-      member: WorkspaceMember | null;
-      id?: string;
+      displayName: string;
+      id: string;
     }>(`/workspaces/${workspaceId}/invitations`, {
       method: 'POST',
       body: JSON.stringify(input),
@@ -291,6 +302,40 @@ export async function acceptWorkspaceInviteAction(
     return { ok: true, data };
   } catch (error) {
     return actionError(error, 'Accept invite failed');
+  }
+}
+
+export async function respondWorkspaceInviteAction(
+  invitationId: string,
+  action: 'accept' | 'decline',
+): Promise<
+  ActionResult<{
+    status: 'accepted' | 'declined';
+    workspaceId: string;
+    workspaceName: string;
+    role?: string;
+  }>
+> {
+  try {
+    const data = await serverApi<{
+      status: 'accepted' | 'declined';
+      workspaceId: string;
+      workspaceName: string;
+      role?: string;
+    }>('/workspaces/invitations/respond', {
+      method: 'POST',
+      body: JSON.stringify({ invitationId, action }),
+    });
+    revalidatePath('/app');
+    if (data.status === 'accepted') {
+      revalidatePath(`/app/w/${data.workspaceId}`);
+    }
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(
+      error,
+      action === 'accept' ? 'Accept invite failed' : 'Decline invite failed',
+    );
   }
 }
 
@@ -407,16 +452,54 @@ export async function updateDocumentShareAccessAction(
 ): Promise<ActionResult<DocumentShare>> {
   try {
     const data = await serverApi<DocumentShare>(
-      `/documents/${documentId}/shares`,
+      `/documents/${documentId}/shares/${input.userId}`,
       {
-        method: 'POST',
-        body: JSON.stringify(input),
+        method: 'PATCH',
+        body: JSON.stringify({ access: input.access }),
       },
     );
     revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
     return { ok: true, data };
   } catch (error) {
     return actionError(error, 'Update share failed');
+  }
+}
+
+export async function respondDocumentShareInviteAction(
+  invitationId: string,
+  action: 'accept' | 'decline',
+): Promise<
+  ActionResult<{
+    status: 'accepted' | 'declined';
+    documentId: string;
+    workspaceId: string;
+    documentTitle?: string;
+    access?: DocumentAccess;
+  }>
+> {
+  try {
+    const data = await serverApi<{
+      status: 'accepted' | 'declined';
+      documentId: string;
+      workspaceId: string;
+      documentTitle?: string;
+      access?: DocumentAccess;
+    }>('/documents/share-invitations/respond', {
+      method: 'POST',
+      body: JSON.stringify({ invitationId, action }),
+    });
+    revalidatePath('/app');
+    if (data.status === 'accepted') {
+      revalidatePath(
+        `/app/w/${data.workspaceId}/d/${data.documentId}`,
+      );
+    }
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(
+      error,
+      action === 'accept' ? 'Accept share failed' : 'Decline share failed',
+    );
   }
 }
 

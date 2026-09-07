@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import {
   createPublicLinkAction,
   publishDocumentAction,
@@ -13,6 +13,7 @@ import {
 import type {
   DocumentAccess,
   DocumentDetail,
+  DocumentShareInvitation,
   WorkspaceMember,
 } from '@/lib/types';
 
@@ -30,23 +31,24 @@ export function DocumentAccessPanel({
   workspaceId,
   documentId,
   initial,
-  members,
 }: {
   workspaceId: string;
   documentId: string;
   initial: DocumentDetail;
-  members: WorkspaceMember[];
+  members?: WorkspaceMember[];
 }) {
   const [doc, setDoc] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [shareUserId, setShareUserId] = useState('');
   const [shareEmail, setShareEmail] = useState('');
   const [shareAccess, setShareAccess] = useState<DocumentAccess>('VIEW');
   const [linkAccess, setLinkAccess] = useState<DocumentAccess>('VIEW');
   const [linkDays, setLinkDays] = useState('0');
   const [freshLink, setFreshLink] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [invitations, setInvitations] = useState(
+    initial.shareInvitations ?? [],
+  );
 
   const canEdit = doc.access >= ACCESS_EDIT;
   const canManage = doc.access >= ACCESS_MANAGE;
@@ -54,15 +56,6 @@ export function DocumentAccessPanel({
   const publicUrl = doc.publicSlug
     ? `${appOrigin()}/p/${doc.publicSlug}`
     : null;
-
-  const shareCandidates = useMemo(
-    () =>
-      members.filter(
-        (member) =>
-          !doc.shares.some((share) => share.userId === member.userId),
-      ),
-    [members, doc.shares],
-  );
 
   function run(task: () => Promise<void>) {
     setError(null);
@@ -125,34 +118,19 @@ export function DocumentAccessPanel({
       {canManage ? (
         <>
           <div>
-            <p className="text-sm text-muted">Share with person</p>
+            <p className="text-[13px] font-medium">Share page</p>
+            <p className="mt-0.5 text-[12px] text-muted">
+              Invite by email → Accept in Alerts. Workspace members already see
+              pages by role; use this to raise a Viewer to Edit on this page, or
+              share with someone outside the workspace.
+            </p>
             <div className="mt-2 space-y-2">
-              {shareCandidates.length > 0 ? (
-                <select
-                  className="field"
-                  value={shareUserId}
-                  onChange={(event) => {
-                    setShareUserId(event.target.value);
-                    setShareEmail('');
-                  }}
-                >
-                  <option value="">Workspace member…</option>
-                  {shareCandidates.map((member) => (
-                    <option key={member.userId} value={member.userId}>
-                      {member.user.displayName} ({member.user.email})
-                    </option>
-                  ))}
-                </select>
-              ) : null}
               <input
                 className="field"
                 type="email"
-                placeholder="Or email of registered user"
+                placeholder="user@example.com"
                 value={shareEmail}
-                onChange={(event) => {
-                  setShareEmail(event.target.value);
-                  setShareUserId('');
-                }}
+                onChange={(event) => setShareEmail(event.target.value)}
               />
               <select
                 className="field"
@@ -167,7 +145,7 @@ export function DocumentAccessPanel({
               <button
                 type="button"
                 className="btn btn-ghost w-full"
-                disabled={pending || (!shareUserId && !shareEmail.trim())}
+                disabled={pending || !shareEmail.trim()}
                 onClick={() =>
                   run(async () => {
                     const result = await shareDocumentAction(
@@ -175,39 +153,49 @@ export function DocumentAccessPanel({
                       workspaceId,
                       {
                         access: shareAccess,
-                        ...(shareUserId
-                          ? { userId: shareUserId }
-                          : { email: shareEmail.trim() }),
+                        email: shareEmail.trim(),
                       },
                     );
                     if (!result.ok) {
                       setError(result.error);
                       return;
                     }
-                    setDoc((prev) => {
-                      const others = prev.shares.filter(
-                        (share) => share.userId !== result.data.userId,
-                      );
-                      return {
-                        ...prev,
-                        shares: [...others, result.data],
-                      };
-                    });
-                    setShareUserId('');
+                    const invite: DocumentShareInvitation = {
+                      id: result.data.id,
+                      email: result.data.email,
+                      access: result.data.access,
+                      expiresAt: result.data.expiresAt,
+                      createdAt: new Date().toISOString(),
+                    };
+                    setInvitations((prev) => [
+                      invite,
+                      ...prev.filter((row) => row.email !== invite.email),
+                    ]);
                     setShareEmail('');
-                    setMessage(`Shared with ${result.data.user.displayName}.`);
+                    setMessage(
+                      `Invite sent to ${result.data.displayName}. Waiting for accept.`,
+                    );
                   })
                 }
               >
-                Add share
+                Send share invite
               </button>
             </div>
+            {invitations.length > 0 ? (
+              <ul className="mt-3 space-y-1 text-[13px] text-muted">
+                {invitations.map((invite) => (
+                  <li key={invite.id}>
+                    Pending · {invite.email} · {invite.access}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {doc.shares.length > 0 ? (
               <ul className="mt-3 space-y-2">
                 {doc.shares.map((share) => (
                   <li
                     key={share.id}
-                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 text-[13px]"
                   >
                     <span className="truncate">
                       {share.user.displayName}
@@ -215,7 +203,7 @@ export function DocumentAccessPanel({
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
                       <select
-                        className="field !w-auto !py-1 !text-xs"
+                        className="field !w-auto !py-1 !text-[12px]"
                         value={share.access === 'MANAGE' ? 'EDIT' : share.access}
                         disabled={pending}
                         onChange={(event) => {
@@ -249,7 +237,7 @@ export function DocumentAccessPanel({
                       </select>
                       <button
                         type="button"
-                        className="text-xs text-danger"
+                        className="text-[12px] text-danger"
                         disabled={pending}
                         onClick={() =>
                           run(async () => {
@@ -281,7 +269,7 @@ export function DocumentAccessPanel({
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-sm text-muted">No direct shares yet.</p>
+              <p className="mt-2 text-[13px] text-muted">No accepted shares yet.</p>
             )}
           </div>
 

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { moveDocumentAction } from '@/lib/actions';
+import { createDocumentAction, moveDocumentAction } from '@/lib/actions';
 import type { DocumentTreeItem } from '@/lib/types';
 
 function buildForest(items: DocumentTreeItem[]) {
@@ -40,7 +40,7 @@ function TreeNodes({
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   if (nodes.length === 0 && depth === 0) {
-    return <p className="empty">No documents yet.</p>;
+    return <p className="empty mt-3">No documents yet.</p>;
   }
 
   function runMove(
@@ -59,8 +59,8 @@ function TreeNodes({
     <ul
       className={
         depth === 0
-          ? 'space-y-1'
-          : 'ml-4 space-y-1 border-l border-line pl-3'
+          ? 'mt-3 space-y-0.5'
+          : 'ml-3 space-y-0.5 border-l border-line pl-2'
       }
     >
       {nodes.map((node, index) => (
@@ -92,22 +92,37 @@ function TreeNodes({
                 rank: lastChild ? `${lastChild.rank}z` : 'a0',
               });
             }}
-            className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 hover:bg-white/70 ${
-              dragOverId === node.id ? 'bg-accent/10 ring-1 ring-accent/40' : ''
+            className={`group flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-neutral-50 ${
+              dragOverId === node.id ? 'bg-neutral-100 ring-1 ring-line' : ''
             }`}
           >
             <Link
               href={`/app/w/${workspaceId}/d/${node.id}`}
-              className="min-w-0 flex-1 font-medium"
+              className="min-w-0 flex-1 truncate text-[13px] font-medium"
             >
               {node.title}
             </Link>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
               {canEdit ? (
                 <>
+                  <form
+                    action={createDocumentAction.bind(null, workspaceId)}
+                    className="inline"
+                  >
+                    <input type="hidden" name="parentId" value={node.id} />
+                    <input type="hidden" name="title" value="Untitled" />
+                    <button
+                      type="submit"
+                      className="rounded px-1 text-[11px] text-muted hover:bg-white hover:text-ink"
+                      title="Add nested page"
+                      disabled={pending}
+                    >
+                      +
+                    </button>
+                  </form>
                   <button
                     type="button"
-                    className="rounded px-1.5 text-xs text-muted hover:bg-white"
+                    className="rounded px-1 text-[11px] text-muted hover:bg-white"
                     title="Move up"
                     disabled={pending || index === 0}
                     onClick={() => {
@@ -123,7 +138,7 @@ function TreeNodes({
                   </button>
                   <button
                     type="button"
-                    className="rounded px-1.5 text-xs text-muted hover:bg-white"
+                    className="rounded px-1 text-[11px] text-muted hover:bg-white"
                     title="Move down"
                     disabled={pending || index >= nodes.length - 1}
                     onClick={() => {
@@ -140,12 +155,10 @@ function TreeNodes({
                   {node.parentId ? (
                     <button
                       type="button"
-                      className="rounded px-1.5 text-xs text-muted hover:bg-white"
+                      className="rounded px-1 text-[11px] text-muted hover:bg-white"
                       title="Move to root"
                       disabled={pending}
-                      onClick={() =>
-                        runMove(node.id, { parentId: null })
-                      }
+                      onClick={() => runMove(node.id, { parentId: null })}
                     >
                       ↖
                     </button>
@@ -153,7 +166,7 @@ function TreeNodes({
                 </>
               ) : null}
               {node.publicationStatus === 'PUBLISHED' ? (
-                <span className="text-xs uppercase tracking-wide text-accent">
+                <span className="text-[10px] uppercase tracking-wide text-muted">
                   live
                 </span>
               ) : null}
@@ -186,10 +199,11 @@ export function DocumentTreeNav({
   const byParent = buildForest(documents);
 
   return (
-    <div className="mt-6">
+    <div>
       {canEdit ? (
-        <p className="mb-2 text-xs text-muted">
-          Drag onto a page to nest. ↑↓ reorder · ↖ un-nest.
+        <p className="mt-3 text-[12px] text-muted">
+          Nested pages like Notion: drag onto a page, or use + / parent in New
+          page. ↑↓ reorder · ↖ un-nest.
         </p>
       ) : null}
       <TreeNodes

@@ -4,11 +4,11 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
-  ValidateIf,
 } from 'class-validator';
 
 export class CreateDocumentDto {
@@ -44,19 +44,23 @@ export class RenameDocumentDto {
 }
 
 export class ShareDocumentDto {
-  @ApiPropertyOptional()
-  @ValidateIf((dto: ShareDocumentDto) => !dto.email)
-  @IsUUID()
-  userId?: string;
-
-  @ApiPropertyOptional()
-  @ValidateIf((dto: ShareDocumentDto) => !dto.userId)
+  @ApiProperty()
   @IsEmail()
-  email?: string;
+  email: string;
 
   @ApiProperty({ enum: DocumentAccess })
   @IsEnum(DocumentAccess)
   access: DocumentAccess;
+}
+
+export class RespondDocumentShareDto {
+  @ApiProperty()
+  @IsUUID()
+  invitationId: string;
+
+  @ApiProperty({ enum: ['accept', 'decline'] })
+  @IsIn(['accept', 'decline'])
+  action: 'accept' | 'decline';
 }
 
 export class CreatePublicLinkDto {

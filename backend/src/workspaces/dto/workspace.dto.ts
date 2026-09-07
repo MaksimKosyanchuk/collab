@@ -1,6 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { WorkspaceRole } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateWorkspaceDto {
   @ApiProperty()
@@ -30,6 +38,16 @@ export class AcceptInviteDto {
   @ApiProperty()
   @IsString()
   token: string;
+}
+
+export class RespondInviteDto {
+  @ApiProperty()
+  @IsUUID()
+  invitationId: string;
+
+  @ApiProperty({ enum: ['accept', 'decline'] })
+  @IsIn(['accept', 'decline'])
+  action: 'accept' | 'decline';
 }
 
 export class RenameWorkspaceDto {

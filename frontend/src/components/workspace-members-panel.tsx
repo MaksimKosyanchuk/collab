@@ -16,13 +16,6 @@ import type {
 
 type InviteRole = Exclude<WorkspaceRole, 'OWNER'>;
 
-function appOrigin() {
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
-  }
-  return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-}
-
 export function WorkspaceMembersPanel({
   workspaceId,
   members: initialMembers,
@@ -42,7 +35,6 @@ export function WorkspaceMembersPanel({
   const [invitations, setInvitations] = useState(initialInvitations);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<InviteRole>('EDITOR');
-  const [freshInviteUrl, setFreshInviteUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -69,32 +61,35 @@ export function WorkspaceMembersPanel({
   }
 
   return (
-    <section className="panel rounded-[1.5rem] p-6">
-      <h2 className="text-lg font-semibold">Members</h2>
-      <p className="mt-1 text-sm text-muted">
-        Registered users are added immediately. Others get an invite link.
+    <section className="panel p-4">
+      <h2 className="text-sm font-semibold">Members</h2>
+      <p className="mt-1 text-[13px] text-muted">
+        Invite registered users. They get a request in Alerts and join only after
+        accepting.
       </p>
 
-      <ul className="mt-5 space-y-3">
+      <ul className="mt-4 space-y-2">
         {sortedMembers.map((member) => (
           <li
             key={member.id}
-            className="flex flex-wrap items-center justify-between gap-2 border-b border-line/70 pb-3 last:border-0 last:pb-0"
+            className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2 last:border-0 last:pb-0"
           >
             <div className="min-w-0">
-              <p className="truncate font-medium">
+              <p className="truncate text-sm font-medium">
                 {member.user.displayName}
                 {member.userId === currentUserId ? (
                   <span className="text-muted"> (you)</span>
                 ) : null}
               </p>
-              <p className="truncate text-sm text-muted">{member.user.email}</p>
+              <p className="truncate text-[12px] text-muted">
+                {member.user.email}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               {canManage && member.role !== 'OWNER' ? (
                 <>
                   <select
-                    className="field !w-auto !py-1.5 !text-sm"
+                    className="field !w-auto !py-1 !text-[13px]"
                     value={member.role}
                     disabled={pending}
                     onChange={(event) => {
@@ -126,7 +121,7 @@ export function WorkspaceMembersPanel({
                   </select>
                   <button
                     type="button"
-                    className="btn btn-danger !px-3 !py-1.5 text-sm"
+                    className="btn btn-danger !px-2.5 !py-1 text-[12px]"
                     disabled={pending}
                     onClick={() =>
                       run(async () => {
@@ -149,7 +144,7 @@ export function WorkspaceMembersPanel({
                   </button>
                 </>
               ) : (
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
                   {member.role}
                 </span>
               )}
@@ -159,8 +154,8 @@ export function WorkspaceMembersPanel({
       </ul>
 
       {canManage ? (
-        <div className="mt-6 space-y-3 border-t border-line pt-5">
-          <p className="text-sm font-medium">Invite or add</p>
+        <div className="mt-4 space-y-2 border-t border-line pt-4">
+          <p className="text-sm font-medium">Invite</p>
           <input
             className="field"
             type="email"
@@ -191,31 +186,21 @@ export function WorkspaceMembersPanel({
                   setError(result.error);
                   return;
                 }
-                if (result.data.status === 'added' && result.data.member) {
-                  setMembers((prev) => [...prev, result.data.member!]);
-                  setFreshInviteUrl(null);
-                  setMessage(
-                    `Added ${result.data.member.user.displayName} as ${result.data.role}.`,
-                  );
-                } else if (result.data.token) {
-                  const url = `${appOrigin()}/invite?t=${encodeURIComponent(result.data.token)}`;
-                  setFreshInviteUrl(url);
-                  setInvitations((prev) => [
-                    {
-                      id: result.data.id ?? crypto.randomUUID(),
-                      email: result.data.email,
-                      role: result.data.role,
-                      expiresAt: new Date(
-                        Date.now() + 7 * 24 * 60 * 60 * 1000,
-                      ).toISOString(),
-                      createdAt: new Date().toISOString(),
-                    },
-                    ...prev,
-                  ]);
-                  setMessage(
-                    `Invite created for ${result.data.email}. Copy the link once.`,
-                  );
-                }
+                setInvitations((prev) => [
+                  {
+                    id: result.data.id,
+                    email: result.data.email,
+                    role: result.data.role,
+                    expiresAt: new Date(
+                      Date.now() + 7 * 24 * 60 * 60 * 1000,
+                    ).toISOString(),
+                    createdAt: new Date().toISOString(),
+                  },
+                  ...prev.filter((row) => row.email !== result.data.email),
+                ]);
+                setMessage(
+                  `Invite sent to ${result.data.displayName}. Waiting for accept.`,
+                );
                 setEmail('');
               })
             }
@@ -223,30 +208,8 @@ export function WorkspaceMembersPanel({
             Send invite
           </button>
 
-          {freshInviteUrl ? (
-            <div className="rounded-xl border border-line bg-white/70 p-3">
-              <p className="text-xs text-muted">Invite URL (shown once)</p>
-              <a
-                href={freshInviteUrl}
-                className="mt-1 block break-all text-xs font-medium text-accent underline-offset-2 hover:underline"
-              >
-                {freshInviteUrl}
-              </a>
-              <button
-                type="button"
-                className="btn btn-ghost mt-2 w-full"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(freshInviteUrl);
-                  setMessage('Invite link copied.');
-                }}
-              >
-                Copy invite link
-              </button>
-            </div>
-          ) : null}
-
           {invitations.length > 0 ? (
-            <ul className="space-y-2 text-sm text-muted">
+            <ul className="space-y-1 text-[13px] text-muted">
               {invitations.map((invite) => (
                 <li key={invite.id}>
                   Pending · {invite.email} · {invite.role}
@@ -258,7 +221,7 @@ export function WorkspaceMembersPanel({
       ) : null}
 
       {myRole && myRole !== 'OWNER' ? (
-        <div className="mt-6 border-t border-line pt-5">
+        <div className="mt-4 border-t border-line pt-4">
           <button
             type="button"
             className="btn btn-danger w-full"
@@ -280,8 +243,8 @@ export function WorkspaceMembersPanel({
         </div>
       ) : null}
 
-      {message ? <p className="mt-4 text-sm text-accent">{message}</p> : null}
-      {error ? <p className="error mt-4">{error}</p> : null}
+      {message ? <p className="mt-3 text-[13px] text-accent">{message}</p> : null}
+      {error ? <p className="error mt-3">{error}</p> : null}
     </section>
   );
 }
