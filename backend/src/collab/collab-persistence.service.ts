@@ -1,9 +1,8 @@
+import { createHash, randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
-import { createHash } from 'crypto';
 import * as Y from 'yjs';
 import { PrismaService } from '../prisma/prisma.service';
-
-const COMPACT_AFTER = 100;
+import { COLLAB_PERSISTENCE } from './collab-policy';
 
 function toBytes(data: Uint8Array): Uint8Array<ArrayBuffer> {
   const copy = new Uint8Array(data.byteLength);
@@ -18,7 +17,12 @@ export class CollabPersistenceService {
   async initializeDocument(documentId: string, title: string): Promise<void> {
     const ydoc = new Y.Doc();
     ydoc.getMap('meta').set('title', title);
-    ydoc.getArray('blocks');
+    const blocks = ydoc.getArray('blocks');
+    const block = new Y.Map();
+    block.set('id', randomUUID());
+    block.set('type', 'paragraph');
+    block.set('text', '');
+    blocks.push([block]);
     const state = toBytes(Y.encodeStateAsUpdate(ydoc));
     await this.prisma.documentCollabState.create({
       data: { documentId, state, updateCount: 0 },
@@ -61,7 +65,7 @@ export class CollabPersistenceService {
     const count = await this.prisma.documentCollabUpdate.count({
       where: { documentId },
     });
-    if (count >= COMPACT_AFTER) {
+    if (count >= COLLAB_PERSISTENCE.COMPACT_UPDATE_THRESHOLD) {
       await this.compact(documentId);
     }
     return { applied: true };
@@ -73,8 +77,17 @@ export class CollabPersistenceService {
     await this.prisma.$transaction([
       this.prisma.documentCollabState.upsert({
         where: { documentId },
-        update: { state, updateCount: { increment: 1 }, compactedAt: new Date() },
-        create: { documentId, state, updateCount: 1, compactedAt: new Date() },
+        update: {
+          state,
+          updateCount: { increment: 1 },
+          compactedAt: new Date(),
+        },
+        create: {
+          documentId,
+          state,
+          updateCount: 1,
+          compactedAt: new Date(),
+        },
       }),
       this.prisma.documentCollabUpdate.deleteMany({ where: { documentId } }),
     ]);
@@ -93,5 +106,26 @@ export class CollabPersistenceService {
     return this.prisma.documentVersion.create({
       data: { documentId, state, title, trigger, createdById },
     });
+  }
+
+  async replaceState(documentId: string, state: Uint8Array): Promise<void> {
+    const bytes = toBytes(state);
+    await this.prisma.$transaction([
+      this.prisma.documentCollabUpdate.deleteMany({ where: { documentId } }),
+      this.prisma.documentCollabState.upsert({
+        where: { documentId },
+        update: {
+          state: bytes,
+          compactedAt: new Date(),
+          updateCount: { increment: 1 },
+        },
+        create: {
+          documentId,
+          state: bytes,
+          compactedAt: new Date(),
+          updateCount: 1,
+        },
+      }),
+    ]);
   }
 }

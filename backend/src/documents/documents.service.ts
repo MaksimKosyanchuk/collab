@@ -9,6 +9,7 @@ import sanitizeHtml from 'sanitize-html';
 import { AccessService, AccessContext, hashToken } from '../access/access.service';
 import { canEdit } from '../access/access.policy';
 import { CollabPersistenceService } from '../collab/collab-persistence.service';
+import { CollabRoomsService } from '../collab/collab-rooms.service';
 import { PlanLimitException } from '../common/exceptions/plan-limit.exception';
 import { nextRank, slugify } from '../common/ids';
 import { PLAN_LIMITS } from '../common/plan-limits';
@@ -27,6 +28,7 @@ export class DocumentsService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly collab: CollabPersistenceService,
+    private readonly rooms: CollabRoomsService,
     private readonly outbox: OutboxService,
   ) {}
 
@@ -166,6 +168,8 @@ export class DocumentsService {
       where: { id: documentId },
       data: { deletedAt: new Date() },
     });
+    // Active editors must get document_deleted and have sockets closed.
+    this.rooms.closeDeleted(documentId);
     await this.outbox.enqueue({
       type: 'search.delete',
       aggregateType: 'document',
@@ -278,6 +282,56 @@ export class DocumentsService {
       },
     });
     return { id: link.id, token, access: link.access, expiresAt: link.expiresAt };
+  }
+
+  async listVersions(documentId: string, ctx: AccessContext) {
+    await this.access.assertDocumentView(documentId, ctx);
+    return this.prisma.documentVersion.findMany({
+      where: { documentId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        trigger: true,
+        createdAt: true,
+        createdById: true,
+      },
+    });
+  }
+
+  async createSnapshot(documentId: string, ctx: AccessContext, userId: string) {
+    const { document } = await this.access.assertDocumentEdit(documentId, ctx);
+    const version = await this.collab.snapshot(
+      documentId,
+      document.title,
+      'MANUAL',
+      userId,
+    );
+    return {
+      id: version.id,
+      title: version.title,
+      trigger: version.trigger,
+      createdAt: version.createdAt,
+    };
+  }
+
+  async restoreVersion(
+    documentId: string,
+    versionId: string,
+    ctx: AccessContext,
+    userId: string,
+  ) {
+    await this.access.assertDocumentEdit(documentId, ctx);
+    const version = await this.prisma.documentVersion.findFirst({
+      where: { id: versionId, documentId },
+    });
+    if (!version) {
+      throw new NotFoundException('Version not found');
+    }
+    await this.collab.snapshot(documentId, version.title, 'RESTORE', userId);
+    await this.collab.replaceState(documentId, new Uint8Array(version.state));
+    await this.rooms.reload(documentId);
+    return { restored: versionId };
   }
 
   private async enqueueIndex(workspaceId: string, documentId: string) {

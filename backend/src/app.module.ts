@@ -11,6 +11,7 @@ import { BillingModule } from './billing/billing.module';
 import { SearchModule } from './search/search.module';
 import { CommentsModule } from './comments/comments.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AssetsModule } from './assets/assets.module';
 import { CollabModule } from './collab/collab.module';
 import { LoggerModule } from './logger/logger.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -37,6 +38,7 @@ import { CorrelationInterceptor } from './common/interceptors/correlation.interc
     CommentsModule,
     NotificationsModule,
     CollabModule,
+    AssetsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

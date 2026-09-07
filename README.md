@@ -18,8 +18,10 @@ This is a fullstack test project. The canonical specification is `docs/ТЗ_те
 - Frontend: Next.js App Router — Server Components / SSR / ISR for public pages; Client Components for the editor and presence
 - Backend: NestJS + Prisma + PostgreSQL, Redis + BullMQ, Meilisearch, MinIO
 - Auth: JWT access + refresh
-- Realtime: Yjs (persistence in Postgres; WebSocket gateway next)
+- Realtime: Yjs over WebSocket `ws://localhost:3001/collab?documentId=&token=`
 - Billing: mock Stripe-like webhooks (idempotent)
+
+Join payload (JSON): `{ "type": "join", "documentId", "token" }`. Updates: `{ "type": "update", "update": "<base64 Yjs update>" }`. Presence: `{ "type": "cursor", "blockId", "offset" }`. Viewers receive sync/updates but cannot apply edits.
 
 ## Run
 

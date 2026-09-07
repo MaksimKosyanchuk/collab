@@ -135,4 +135,40 @@ export class DocumentsController {
       dto,
     );
   }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Get('documents/:documentId/versions')
+  listVersions(
+    @CurrentUser() user: AuthUser,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.documents.listVersions(documentId, { userId: user.id });
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Post('documents/:documentId/versions')
+  snapshot(
+    @CurrentUser() user: AuthUser,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.documents.createSnapshot(documentId, { userId: user.id }, user.id);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Post('documents/:documentId/versions/:versionId/restore')
+  restore(
+    @CurrentUser() user: AuthUser,
+    @Param('documentId') documentId: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.documents.restoreVersion(
+      documentId,
+      versionId,
+      { userId: user.id },
+      user.id,
+    );
+  }
 }
