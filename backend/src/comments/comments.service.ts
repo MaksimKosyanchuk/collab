@@ -2,9 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AccessService, AccessContext } from '../access/access.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OutboxService } from '../queue/outbox.service';
-
 const MENTION_RE = /@([a-zA-Z0-9._-]+)/g;
-
 @Injectable()
 export class CommentsService {
 	constructor(
@@ -12,7 +10,6 @@ export class CommentsService {
 		private readonly access: AccessService,
 		private readonly outbox: OutboxService,
 	) {}
-
 	async list(documentId: string, ctx: AccessContext) {
 		await this.access.assertDocumentView(documentId, ctx);
 		return this.prisma.commentThread.findMany({
@@ -27,7 +24,6 @@ export class CommentsService {
 			orderBy: { createdAt: 'asc' },
 		});
 	}
-
 	async createThread(documentId: string, userId: string, blockId: string, body: string) {
 		await this.access.assertDocumentEdit(documentId, { userId });
 		const thread = await this.prisma.commentThread.create({
@@ -44,7 +40,6 @@ export class CommentsService {
 		await this.enqueueMentions(thread.id, userId, body);
 		return thread;
 	}
-
 	async addComment(threadId: string, userId: string, body: string) {
 		const thread = await this.prisma.commentThread.findUnique({
 			where: { id: threadId },
@@ -59,7 +54,6 @@ export class CommentsService {
 		await this.enqueueMentions(threadId, userId, body);
 		return comment;
 	}
-
 	async resolve(threadId: string, userId: string, resolved = true) {
 		const thread = await this.prisma.commentThread.findUnique({
 			where: { id: threadId },
@@ -73,7 +67,6 @@ export class CommentsService {
 			data: { resolvedAt: resolved ? new Date() : null },
 		});
 	}
-
 	private async enqueueMentions(threadId: string, authorId: string, body: string) {
 		const names = [...body.matchAll(MENTION_RE)].map((match) => match[1]);
 		if (names.length === 0) {

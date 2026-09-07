@@ -8,19 +8,17 @@ import { LoggerService } from '../logger/logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCheckoutDto } from './dto/billing.dto';
 import { BillingWebhookJob } from './billing.processor';
-
 @Injectable()
 export class BillingService implements OnModuleInit, OnModuleDestroy {
 	private queueEvents?: QueueEvents;
-
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly access: AccessService,
 		private readonly logger: LoggerService,
 		private readonly config: ConfigService,
-		@InjectQueue('billing-webhook') private readonly billingQueue: Queue,
+		@InjectQueue('billing-webhook')
+		private readonly billingQueue: Queue,
 	) {}
-
 	async onModuleInit(): Promise<void> {
 		this.queueEvents = new QueueEvents('billing-webhook', {
 			connection: {
@@ -30,11 +28,9 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
 		});
 		await this.queueEvents.waitUntilReady();
 	}
-
 	async onModuleDestroy(): Promise<void> {
 		await this.queueEvents?.close();
 	}
-
 	async createCheckout(userId: string, dto: CreateCheckoutDto) {
 		await this.access.assertWorkspaceManage(dto.workspaceId, userId);
 		if (dto.plan === PlanTier.FREE) {
@@ -48,11 +44,6 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
 			},
 		});
 	}
-
-	/**
-	 * Enqueue webhook onto BullMQ (jobId = external event id), then wait for the
-	 * worker so HTTP clients still get the idempotent result synchronously.
-	 */
 	async enqueueWebhook(payload: BillingWebhookJob) {
 		let job: Job<BillingWebhookJob> | undefined;
 		try {
@@ -80,12 +71,11 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
 		if (state === 'failed') {
 			throw new Error(job.failedReason ?? 'Billing webhook job failed');
 		}
-		return (await job.waitUntilFinished(this.queueEvents, 20_000)) as {
+		return (await job.waitUntilFinished(this.queueEvents, 20000)) as {
 			duplicate: boolean;
 			eventId: string;
 		};
 	}
-
 	async handleWebhook(
 		externalId: string,
 		type: string,
@@ -105,7 +95,6 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
 			});
 			return { duplicate: true, eventId: existing.id };
 		}
-
 		try {
 			const event = await this.prisma.$transaction(async (tx) => {
 				const created = await tx.billingEvent.create({
@@ -134,13 +123,11 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
 			throw error;
 		}
 	}
-
 	private async applyPlan(workspaceId: string, plan: PlanTier, checkoutSessionId: string | null) {
 		return this.prisma.$transaction((tx) =>
 			this.applyPlanTx(tx, workspaceId, plan, checkoutSessionId),
 		);
 	}
-
 	private async applyPlanTx(
 		tx: Prisma.TransactionClient,
 		workspaceId: string,

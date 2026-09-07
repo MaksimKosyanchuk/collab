@@ -10,16 +10,13 @@ import {
 	canView,
 	resolveDocumentAccess,
 } from './access.policy';
-
 export type AccessContext = {
 	userId?: string | null;
 	shareToken?: string | null;
 };
-
 @Injectable()
 export class AccessService {
 	constructor(private readonly prisma: PrismaService) {}
-
 	async getWorkspaceRole(workspaceId: string, userId?: string | null) {
 		if (!userId) {
 			return null;
@@ -29,7 +26,6 @@ export class AccessService {
 		});
 		return member?.role ?? null;
 	}
-
 	async assertWorkspaceMember(workspaceId: string, userId: string) {
 		const role = await this.getWorkspaceRole(workspaceId, userId);
 		if (!role) {
@@ -37,7 +33,6 @@ export class AccessService {
 		}
 		return role;
 	}
-
 	async assertWorkspaceManage(workspaceId: string, userId: string) {
 		const role = await this.assertWorkspaceMember(workspaceId, userId);
 		if (role !== 'OWNER' && role !== 'ADMIN') {
@@ -45,8 +40,6 @@ export class AccessService {
 		}
 		return role;
 	}
-
-	/** Create/move-in-tree at workspace scope (Viewer cannot create pages). */
 	async assertWorkspaceDocumentCreate(workspaceId: string, userId: string) {
 		const role = await this.assertWorkspaceMember(workspaceId, userId);
 		if (!canCreateWorkspaceDocuments(role)) {
@@ -54,20 +47,20 @@ export class AccessService {
 		}
 		return role;
 	}
-
 	async resolveDocument(
 		documentId: string,
 		ctx: AccessContext,
-	): Promise<{ document: Document; level: AccessLevelValue }> {
+	): Promise<{
+		document: Document;
+		level: AccessLevelValue;
+	}> {
 		const document = await this.prisma.document.findUnique({
 			where: { id: documentId },
 		});
 		if (!document || document.deletedAt) {
 			throw new NotFoundException('Document not found');
 		}
-
 		const workspaceRole = await this.getWorkspaceRole(document.workspaceId, ctx.userId);
-
 		let shareAccess: 'VIEW' | 'EDIT' | 'MANAGE' | null = null;
 		if (ctx.userId) {
 			const share = await this.prisma.documentShare.findUnique({
@@ -77,7 +70,6 @@ export class AccessService {
 			});
 			shareAccess = share?.access ?? null;
 		}
-
 		let publicLinkAccess: 'VIEW' | 'EDIT' | 'MANAGE' | null = null;
 		if (ctx.shareToken) {
 			const tokenHash = hashToken(ctx.shareToken);
@@ -91,24 +83,19 @@ export class AccessService {
 				(!link.expiresAt || link.expiresAt > new Date());
 			publicLinkAccess = valid && link ? link.access : null;
 		}
-
 		const level = resolveDocumentAccess({
 			workspaceRole,
 			shareAccess,
 			publicLinkAccess,
 		});
-
 		if (!canView(level)) {
 			throw new ForbiddenException('No access to this document');
 		}
-
 		return { document, level };
 	}
-
 	async assertDocumentView(documentId: string, ctx: AccessContext) {
 		return this.resolveDocument(documentId, ctx);
 	}
-
 	async assertDocumentEdit(documentId: string, ctx: AccessContext) {
 		const resolved = await this.resolveDocument(documentId, ctx);
 		if (!canEdit(resolved.level)) {
@@ -116,7 +103,6 @@ export class AccessService {
 		}
 		return resolved;
 	}
-
 	async assertDocumentManage(documentId: string, ctx: AccessContext) {
 		const resolved = await this.resolveDocument(documentId, ctx);
 		if (!canManage(resolved.level)) {
@@ -125,7 +111,6 @@ export class AccessService {
 		return resolved;
 	}
 }
-
 export function hashToken(token: string): string {
 	return createHash('sha256').update(token).digest('hex');
 }

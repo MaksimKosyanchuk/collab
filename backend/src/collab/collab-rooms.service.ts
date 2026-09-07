@@ -7,13 +7,11 @@ import { OutboxService } from '../queue/outbox.service';
 import { CollabPersistenceService } from './collab-persistence.service';
 import { COLLAB_PERSISTENCE, shouldAutoSnapshot } from './collab-policy';
 import { projectYDoc } from './project-ydoc';
-
 type SocketLike = {
 	send: (data: string) => void;
 	close: (code?: number, reason?: string) => void;
 	readyState: number;
 };
-
 export type RoomClient = {
 	socket: SocketLike;
 	documentId: string;
@@ -23,9 +21,11 @@ export type RoomClient = {
 	canEdit: boolean;
 	color: string;
 	shareToken?: string | null;
-	cursor?: { blockId: string; offset: number } | null;
+	cursor?: {
+		blockId: string;
+		offset: number;
+	} | null;
 };
-
 type Room = {
 	documentId: string;
 	workspaceId: string;
@@ -37,20 +37,16 @@ type Room = {
 	applying: boolean;
 	closed: boolean;
 };
-
 const COLORS = ['#e11d48', '#2563eb', '#059669', '#d97706', '#7c3aed', '#db2777'];
-
 @Injectable()
 export class CollabRoomsService {
 	private readonly rooms = new Map<string, Room>();
-
 	constructor(
 		private readonly persistence: CollabPersistenceService,
 		private readonly prisma: PrismaService,
 		private readonly outbox: OutboxService,
 		private readonly access: AccessService,
 	) {}
-
 	async getRoom(documentId: string): Promise<Room> {
 		const existing = this.rooms.get(documentId);
 		if (existing && !existing.closed) {
@@ -78,7 +74,6 @@ export class CollabRoomsService {
 		this.rooms.set(documentId, room);
 		return room;
 	}
-
 	peek(documentId: string): Room | undefined {
 		const room = this.rooms.get(documentId);
 		if (!room || room.closed) {
@@ -86,7 +81,6 @@ export class CollabRoomsService {
 		}
 		return room;
 	}
-
 	addClient(room: Room, client: RoomClient): void {
 		if (room.closed) {
 			client.socket.send(
@@ -101,7 +95,6 @@ export class CollabRoomsService {
 		room.clients.add(client);
 		this.broadcastPresence(room);
 	}
-
 	removeClient(room: Room, client: RoomClient): void {
 		room.clients.delete(client);
 		if (room.closed) {
@@ -112,7 +105,6 @@ export class CollabRoomsService {
 			this.schedulePersist(room, 0);
 		}
 	}
-
 	applyClientUpdate(room: Room, client: RoomClient, updateB64: string): void {
 		if (room.closed) {
 			client.socket.send(
@@ -139,15 +131,16 @@ export class CollabRoomsService {
 		Y.applyUpdate(room.ydoc, new Uint8Array(update), client);
 		room.applying = false;
 	}
-
 	encodeState(room: Room): string {
 		return Buffer.from(Y.encodeStateAsUpdate(room.ydoc)).toString('base64');
 	}
-
 	setCursor(
 		room: Room,
 		client: RoomClient,
-		cursor: { blockId: string; offset: number } | null,
+		cursor: {
+			blockId: string;
+			offset: number;
+		} | null,
 	): void {
 		if (room.closed) {
 			return;
@@ -155,7 +148,6 @@ export class CollabRoomsService {
 		client.cursor = cursor;
 		this.broadcastPresence(room);
 	}
-
 	async reload(documentId: string): Promise<void> {
 		const room = this.rooms.get(documentId);
 		if (!room || room.closed) {
@@ -169,12 +161,6 @@ export class CollabRoomsService {
 		this.attachUpdateHandler(room);
 		this.broadcast(room, { type: 'sync', update: this.encodeState(room) });
 	}
-
-	/**
-	 * Force-flush live (or cold) CRDT state into DocumentProjection.
-	 * Used before publish so public SSR/ISR does not miss in-flight editor edits
-	 * that sat in the debounce window.
-	 */
 	async flushProjection(documentId: string): Promise<void> {
 		const room = this.rooms.get(documentId);
 		if (room && !room.closed) {
@@ -185,18 +171,15 @@ export class CollabRoomsService {
 			await this.flush(room);
 			return;
 		}
-
 		const document = await this.prisma.document.findFirst({
 			where: { id: documentId, deletedAt: null },
 		});
 		if (!document) {
 			return;
 		}
-
 		const ydoc = await this.persistence.loadDoc(documentId);
 		const projected = projectYDoc(ydoc);
 		ydoc.destroy();
-
 		await this.prisma.document.update({
 			where: { id: documentId },
 			data: { title: projected.title },
@@ -219,10 +202,6 @@ export class CollabRoomsService {
 			},
 		});
 	}
-
-	/**
-	 * Soft-delete while editors are connected: notify, close sockets, drop room.
-	 */
 	closeDeleted(documentId: string): void {
 		const room = this.rooms.get(documentId);
 		if (!room) {
@@ -244,15 +223,13 @@ export class CollabRoomsService {
 			try {
 				client.socket.close(4404, 'Document deleted');
 			} catch {
-				// ignore already-closed sockets
+				void 0;
 			}
 		}
 		room.clients.clear();
 		room.ydoc.destroy();
 		this.rooms.delete(documentId);
 	}
-
-	/** @deprecated use closeDeleted for soft-delete edge case */
 	close(documentId: string, reason = 'Document closed'): void {
 		if (reason === 'Document deleted') {
 			this.closeDeleted(documentId);
@@ -268,18 +245,16 @@ export class CollabRoomsService {
 			try {
 				client.socket.close(1000, reason);
 			} catch {
-				// ignore
+				void 0;
 			}
 		}
 		room.clients.clear();
 		room.ydoc.destroy();
 		this.rooms.delete(documentId);
 	}
-
 	nextColor(room: Room): string {
 		return COLORS[room.clients.size % COLORS.length];
 	}
-
 	kickClient(room: Room, client: RoomClient, reason = 'access_revoked'): void {
 		room.clients.delete(client);
 		const payload = JSON.stringify({
@@ -291,13 +266,13 @@ export class CollabRoomsService {
 			try {
 				client.socket.send(payload);
 			} catch {
-				// ignore
+				void 0;
 			}
 		}
 		try {
 			client.socket.close(4403, reason);
 		} catch {
-			// ignore
+			void 0;
 		}
 		if (!room.closed) {
 			this.broadcastPresence(room);
@@ -306,10 +281,6 @@ export class CollabRoomsService {
 			}
 		}
 	}
-
-	/**
-	 * Drop live collab sessions for a user across a workspace (member removed).
-	 */
 	kickUserFromWorkspace(workspaceId: string, userId: string): void {
 		for (const room of this.rooms.values()) {
 			if (room.closed || room.workspaceId !== workspaceId) {
@@ -322,10 +293,6 @@ export class CollabRoomsService {
 			}
 		}
 	}
-
-	/**
-	 * Re-check ACL for one user on every open room in a workspace (role change).
-	 */
 	async revalidateUserInWorkspace(workspaceId: string, userId: string): Promise<void> {
 		for (const room of this.rooms.values()) {
 			if (room.closed || room.workspaceId !== workspaceId) {
@@ -338,7 +305,6 @@ export class CollabRoomsService {
 			}
 		}
 	}
-
 	async revalidateUserOnDocument(documentId: string, userId: string): Promise<void> {
 		const room = this.peek(documentId);
 		if (!room) {
@@ -350,7 +316,6 @@ export class CollabRoomsService {
 			}
 		}
 	}
-
 	async revalidateAllClientsOnDocument(documentId: string): Promise<void> {
 		const room = this.peek(documentId);
 		if (!room) {
@@ -360,7 +325,6 @@ export class CollabRoomsService {
 			await this.revalidateClient(room, client);
 		}
 	}
-
 	async revalidateClient(room: Room, client: RoomClient): Promise<'ok' | 'kicked'> {
 		const userId = client.userId.startsWith('guest:') ? null : client.userId;
 		try {
@@ -385,13 +349,11 @@ export class CollabRoomsService {
 			return 'kicked';
 		}
 	}
-
 	private attachUpdateHandler(room: Room): void {
 		room.ydoc.on('update', (update: Uint8Array, origin: unknown) => {
 			if (room.closed || origin === 'remote' || origin === 'load') {
 				return;
 			}
-			// Replay of the same payload is ignored by unique(hash); do not bump counters.
 			void this.persistence.applyUpdate(room.documentId, update).then((result) => {
 				if (!result.applied || room.closed) {
 					return;
@@ -406,7 +368,6 @@ export class CollabRoomsService {
 			);
 		});
 	}
-
 	private broadcast(room: Room, message: Record<string, unknown>, except?: RoomClient): void {
 		const payload = JSON.stringify(message);
 		for (const client of room.clients) {
@@ -418,7 +379,6 @@ export class CollabRoomsService {
 			}
 		}
 	}
-
 	private broadcastPresence(room: Room): void {
 		this.broadcast(room, {
 			type: 'presence',
@@ -430,7 +390,6 @@ export class CollabRoomsService {
 			})),
 		});
 	}
-
 	private schedulePersist(
 		room: Room,
 		delay: number = COLLAB_PERSISTENCE.FLUSH_DEBOUNCE_MS,
@@ -445,15 +404,12 @@ export class CollabRoomsService {
 			void this.flush(room);
 		}, delay);
 	}
-
 	private async flush(room: Room): Promise<void> {
 		if (room.closed || !this.rooms.has(room.documentId)) {
 			return;
 		}
-
 		await this.persistence.compact(room.documentId);
 		const projected = projectYDoc(room.ydoc);
-
 		if (
 			shouldAutoSnapshot({
 				updatesSinceSnapshot: room.updatesSinceSnapshot,
@@ -464,11 +420,9 @@ export class CollabRoomsService {
 			room.lastSnapshotAt = Date.now();
 			room.updatesSinceSnapshot = 0;
 		}
-
 		if (room.closed || !this.rooms.has(room.documentId)) {
 			return;
 		}
-
 		const document = await this.prisma.document.findFirst({
 			where: { id: room.documentId, deletedAt: null },
 		});
@@ -476,7 +430,6 @@ export class CollabRoomsService {
 			this.closeDeleted(room.documentId);
 			return;
 		}
-
 		await this.prisma.document.update({
 			where: { id: room.documentId },
 			data: { title: projected.title },

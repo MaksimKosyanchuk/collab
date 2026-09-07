@@ -1,7 +1,6 @@
 import { createWorkspaceAction } from '@/lib/actions';
 import type { SharedDocumentItem, Workspace } from '@/lib/types';
 import Link from 'next/link';
-
 export function WorkspaceList({
 	workspaces,
 	sharedDocuments,

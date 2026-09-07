@@ -2,17 +2,19 @@ import { CollabEditor } from '@/components/collab-editor';
 import { apiFetch } from '@/lib/api';
 import type { DocumentDetail } from '@/lib/types';
 import Link from 'next/link';
-
 type Props = {
-	params: Promise<{ documentId: string }>;
-	searchParams: Promise<{ t?: string; token?: string }>;
+	params: Promise<{
+		documentId: string;
+	}>;
+	searchParams: Promise<{
+		t?: string;
+		token?: string;
+	}>;
 };
-
 export default async function ShareLinkPage({ params, searchParams }: Props) {
 	const { documentId } = await params;
 	const query = await searchParams;
 	const shareToken = query.t ?? query.token;
-
 	if (!shareToken) {
 		return (
 			<main className="mx-auto flex min-h-screen max-w-lg items-center px-5 py-12">
@@ -26,12 +28,10 @@ export default async function ShareLinkPage({ params, searchParams }: Props) {
 			</main>
 		);
 	}
-
 	try {
 		const document = await apiFetch<DocumentDetail>(
 			`/public/documents/${documentId}/shared?token=${encodeURIComponent(shareToken)}`,
 		);
-
 		return (
 			<main className="mx-auto min-h-screen max-w-6xl px-4 py-8 md:px-8">
 				<p className="mb-4 text-sm text-muted">

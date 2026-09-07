@@ -1,16 +1,23 @@
 'use client';
-
 import { useToast } from '@/components/toast-provider';
 import { actionFailMessage, messageFromUnknown } from '@/lib/errors';
-
-type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
-
+type ActionResult<T> =
+	| {
+			ok: true;
+			data: T;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
 export function useActionToast() {
 	const { show } = useToast();
-
 	async function runAction<T>(
 		task: () => Promise<ActionResult<T>>,
-		opts?: { success?: string; fallback?: string },
+		opts?: {
+			success?: string;
+			fallback?: string;
+		},
 	): Promise<T | null> {
 		try {
 			const result = await task();
@@ -28,6 +35,5 @@ export function useActionToast() {
 			return null;
 		}
 	}
-
 	return { show, runAction };
 }

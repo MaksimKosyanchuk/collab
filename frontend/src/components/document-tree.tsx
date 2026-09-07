@@ -6,7 +6,6 @@ import { WorkspaceMembersPanel } from '@/components/workspace-members-panel';
 import { WorkspaceSearch } from '@/components/workspace-search';
 import { WorkspaceSettingsForm } from '@/components/workspace-settings-form';
 import type { DocumentTreeItem, WorkspaceDetail } from '@/lib/types';
-
 export function DocumentTree({
 	workspace,
 	documents,
@@ -22,7 +21,6 @@ export function DocumentTree({
 		workspace.myRole === 'ADMIN' ||
 		workspace.myRole === 'EDITOR';
 	const canManage = workspace.myRole === 'OWNER' || workspace.myRole === 'ADMIN';
-
 	return (
 		<div className="mx-auto grid max-w-5xl gap-3 lg:grid-cols-[1fr_320px]">
 			<section className="panel p-3">

@@ -4,16 +4,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 	const clientUrl = process.env.CLIENT_URL;
 	const port = process.env.PORT;
-
 	if (!clientUrl || !port) {
 		throw new Error('CLIENT_URL and PORT must be defined');
 	}
-
 	app.use(
 		helmet({
 			crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -41,7 +38,6 @@ async function bootstrap() {
 			transform: true,
 		}),
 	);
-
 	const swagger = new DocumentBuilder()
 		.setTitle('Collab Docs API')
 		.setDescription(
@@ -56,8 +52,6 @@ async function bootstrap() {
 		jsonDocumentUrl: 'api/docs-json',
 		yamlDocumentUrl: 'api/docs-yaml',
 	});
-
 	await app.listen(Number(port));
 }
-
 void bootstrap();

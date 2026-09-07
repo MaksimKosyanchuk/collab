@@ -1,5 +1,4 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-
 export class PlanLimitException extends HttpException {
 	constructor(resource: 'members' | 'documents' | 'storage', plan: string) {
 		super(

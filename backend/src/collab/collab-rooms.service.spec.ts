@@ -1,7 +1,10 @@
 describe('CollabRoomsService.closeDeleted', () => {
 	it('broadcasts document_deleted, closes sockets, and drops the room', () => {
 		const sent: string[] = [];
-		const closed: Array<{ code?: number; reason?: string }> = [];
+		const closed: Array<{
+			code?: number;
+			reason?: string;
+		}> = [];
 		const socket = {
 			readyState: 1,
 			send: (data: string) => {
@@ -11,15 +14,17 @@ describe('CollabRoomsService.closeDeleted', () => {
 				closed.push({ code, reason });
 			},
 		};
-
-		// Exercise closeDeleted without Nest DI / private-field typing fights.
 		const service = {
 			rooms: new Map<
 				string,
 				{
 					documentId: string;
-					ydoc: { destroy: () => void };
-					clients: Set<{ socket: typeof socket }>;
+					ydoc: {
+						destroy: () => void;
+					};
+					clients: Set<{
+						socket: typeof socket;
+					}>;
 					closed: boolean;
 					persistTimer?: NodeJS.Timeout;
 				}
@@ -53,7 +58,6 @@ describe('CollabRoomsService.closeDeleted', () => {
 				this.rooms.delete(documentId);
 			},
 		};
-
 		const destroyed = { value: false };
 		service.rooms.set('doc-1', {
 			documentId: 'doc-1',
@@ -65,9 +69,7 @@ describe('CollabRoomsService.closeDeleted', () => {
 			clients: new Set([{ socket }]),
 			closed: false,
 		});
-
 		service.closeDeleted('doc-1');
-
 		expect(JSON.parse(sent[0])).toEqual({
 			type: 'document_deleted',
 			documentId: 'doc-1',

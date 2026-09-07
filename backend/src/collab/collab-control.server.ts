@@ -3,19 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { CollabControlCommand, CollabControlReply } from './collab-control';
 import { CollabRoomsService } from './collab-rooms.service';
-
 @Injectable()
 export class CollabControlServer implements OnModuleInit, OnModuleDestroy {
 	private pub!: Redis;
 	private sub!: Redis;
 	private cmdChannel!: string;
 	private replyChannel!: string;
-
 	constructor(
 		private readonly config: ConfigService,
 		private readonly rooms: CollabRoomsService,
 	) {}
-
 	async onModuleInit(): Promise<void> {
 		this.cmdChannel = this.config.get('COLLAB_CMD_CHANNEL', 'collab:cmd');
 		this.replyChannel = this.config.get('COLLAB_REPLY_CHANNEL', 'collab:reply');
@@ -31,11 +28,9 @@ export class CollabControlServer implements OnModuleInit, OnModuleDestroy {
 			void this.handle(raw);
 		});
 	}
-
 	async onModuleDestroy(): Promise<void> {
 		await Promise.allSettled([this.sub?.quit(), this.pub?.quit()]);
 	}
-
 	private async handle(raw: string): Promise<void> {
 		let cmd: CollabControlCommand;
 		try {
@@ -75,7 +70,6 @@ export class CollabControlServer implements OnModuleInit, OnModuleDestroy {
 			});
 		}
 	}
-
 	private async reply(payload: CollabControlReply): Promise<void> {
 		await this.pub.publish(this.replyChannel, JSON.stringify(payload));
 	}

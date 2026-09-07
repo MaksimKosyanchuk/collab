@@ -3,13 +3,11 @@ export type AuthUser = {
 	email: string;
 	displayName: string;
 };
-
 export type AuthTokens = {
 	accessToken: string;
 	refreshToken: string;
 	user: AuthUser;
 };
-
 export type Workspace = {
 	id: string;
 	name: string;
@@ -18,7 +16,6 @@ export type Workspace = {
 	storageUsedBytes: string;
 	createdAt: string;
 };
-
 export type WorkspaceSubscription = {
 	id: string;
 	workspaceId: string;
@@ -26,7 +23,6 @@ export type WorkspaceSubscription = {
 	status: string;
 	currentPeriodEnd: string | null;
 };
-
 export type DocumentTreeItem = {
 	id: string;
 	parentId: string | null;
@@ -35,9 +31,7 @@ export type DocumentTreeItem = {
 	publicationStatus: 'UNPUBLISHED' | 'PUBLISHED';
 	updatedAt: string;
 };
-
 export type DocumentAccess = 'VIEW' | 'EDIT' | 'MANAGE';
-
 export type WorkspaceMember = {
 	id: string;
 	workspaceId: string;
@@ -49,9 +43,7 @@ export type WorkspaceMember = {
 		displayName: string;
 	};
 };
-
 export type WorkspaceRole = WorkspaceMember['role'];
-
 export type WorkspaceInvitation = {
 	id: string;
 	email: string;
@@ -59,14 +51,12 @@ export type WorkspaceInvitation = {
 	expiresAt: string;
 	createdAt: string;
 };
-
 export type WorkspaceDetail = Workspace & {
 	members: WorkspaceMember[];
 	invitations: WorkspaceInvitation[];
 	myRole: WorkspaceRole | null;
 	subscription?: WorkspaceSubscription | null;
 };
-
 export type SharedDocumentItem = {
 	shareId: string;
 	access: DocumentAccess;
@@ -78,7 +68,6 @@ export type SharedDocumentItem = {
 	publicationStatus: 'UNPUBLISHED' | 'PUBLISHED';
 	updatedAt: string;
 };
-
 export type DocumentShare = {
 	id: string;
 	documentId: string;
@@ -90,7 +79,6 @@ export type DocumentShare = {
 		displayName: string;
 	};
 };
-
 export type DocumentShareInvitation = {
 	id: string;
 	email: string;
@@ -98,7 +86,6 @@ export type DocumentShareInvitation = {
 	expiresAt: string;
 	createdAt: string;
 };
-
 export type DocumentPublicLinkMeta = {
 	id: string;
 	tokenPrefix: string;
@@ -106,7 +93,6 @@ export type DocumentPublicLinkMeta = {
 	expiresAt: string | null;
 	createdAt: string;
 };
-
 export type DocumentDetail = {
 	id: string;
 	workspaceId: string;
@@ -119,7 +105,6 @@ export type DocumentDetail = {
 	shareInvitations?: DocumentShareInvitation[];
 	publicLinks: DocumentPublicLinkMeta[];
 };
-
 export type PublishedDocument = {
 	id: string;
 	title: string;
@@ -136,7 +121,6 @@ export type PublishedDocument = {
 	}>;
 	updatedAt: string;
 };
-
 export type DocumentVersion = {
 	id: string;
 	title: string;
@@ -144,13 +128,11 @@ export type DocumentVersion = {
 	createdAt: string;
 	createdById?: string | null;
 };
-
 export type AssetPresign = {
 	objectKey: string;
 	uploadUrl: string;
 	bucket: string;
 };
-
 export type AssetConfirm = {
 	id: string;
 	objectKey: string;
@@ -158,7 +140,6 @@ export type AssetConfirm = {
 	sizeBytes: number;
 	url: string;
 };
-
 export type ApiErrorBody = {
 	statusCode?: number;
 	message?: string | string[];

@@ -3,13 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { CollabControl, CollabControlCommand, CollabControlReply } from './collab-control';
-
 type Pending = {
 	resolve: () => void;
 	reject: (error: Error) => void;
 	timer: NodeJS.Timeout;
 };
-
 @Injectable()
 export class CollabControlClient implements CollabControl, OnModuleInit, OnModuleDestroy {
 	private pub!: Redis;
@@ -18,11 +16,9 @@ export class CollabControlClient implements CollabControl, OnModuleInit, OnModul
 	private readonly timeoutMs: number;
 	private cmdChannel!: string;
 	private replyChannel!: string;
-
 	constructor(private readonly config: ConfigService) {
-		this.timeoutMs = Number(this.config.get('COLLAB_CONTROL_TIMEOUT_MS', 15_000));
+		this.timeoutMs = Number(this.config.get('COLLAB_CONTROL_TIMEOUT_MS', 15000));
 	}
-
 	async onModuleInit(): Promise<void> {
 		this.cmdChannel = this.config.get('COLLAB_CMD_CHANNEL', 'collab:cmd');
 		this.replyChannel = this.config.get('COLLAB_REPLY_CHANNEL', 'collab:reply');
@@ -34,7 +30,6 @@ export class CollabControlClient implements CollabControl, OnModuleInit, OnModul
 			this.onReply(raw);
 		});
 	}
-
 	async onModuleDestroy(): Promise<void> {
 		for (const [, pending] of this.pending) {
 			clearTimeout(pending.timer);
@@ -43,19 +38,15 @@ export class CollabControlClient implements CollabControl, OnModuleInit, OnModul
 		this.pending.clear();
 		await Promise.allSettled([this.sub?.quit(), this.pub?.quit()]);
 	}
-
 	flushProjection(documentId: string): Promise<void> {
 		return this.request({ op: 'flushProjection', documentId });
 	}
-
 	closeDeleted(documentId: string): Promise<void> {
 		return this.request({ op: 'closeDeleted', documentId });
 	}
-
 	reload(documentId: string): Promise<void> {
 		return this.request({ op: 'reload', documentId });
 	}
-
 	revalidateUserOnDocument(documentId: string, userId: string): Promise<void> {
 		return this.request({
 			op: 'revalidateUserOnDocument',
@@ -63,11 +54,9 @@ export class CollabControlClient implements CollabControl, OnModuleInit, OnModul
 			userId,
 		});
 	}
-
 	revalidateAllClientsOnDocument(documentId: string): Promise<void> {
 		return this.request({ op: 'revalidateAllClientsOnDocument', documentId });
 	}
-
 	revalidateUserInWorkspace(workspaceId: string, userId: string): Promise<void> {
 		return this.request({
 			op: 'revalidateUserInWorkspace',
@@ -75,7 +64,6 @@ export class CollabControlClient implements CollabControl, OnModuleInit, OnModul
 			userId,
 		});
 	}
-
 	private redisOptions() {
 		return {
 			host: this.config.get('REDIS_HOST', 'localhost'),
@@ -84,18 +72,29 @@ export class CollabControlClient implements CollabControl, OnModuleInit, OnModul
 			lazyConnect: false,
 		};
 	}
-
 	private request(
 		cmd:
-			| { op: 'flushProjection'; documentId: string }
-			| { op: 'closeDeleted'; documentId: string }
-			| { op: 'reload'; documentId: string }
+			| {
+					op: 'flushProjection';
+					documentId: string;
+			  }
+			| {
+					op: 'closeDeleted';
+					documentId: string;
+			  }
+			| {
+					op: 'reload';
+					documentId: string;
+			  }
 			| {
 					op: 'revalidateUserOnDocument';
 					documentId: string;
 					userId: string;
 			  }
-			| { op: 'revalidateAllClientsOnDocument'; documentId: string }
+			| {
+					op: 'revalidateAllClientsOnDocument';
+					documentId: string;
+			  }
 			| {
 					op: 'revalidateUserInWorkspace';
 					workspaceId: string;
@@ -123,7 +122,6 @@ export class CollabControlClient implements CollabControl, OnModuleInit, OnModul
 				});
 		});
 	}
-
 	private onReply(raw: string): void {
 		let reply: CollabControlReply;
 		try {

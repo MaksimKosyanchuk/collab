@@ -1,9 +1,7 @@
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { renameWorkspaceAction } from '@/lib/actions';
-
 export function WorkspaceSettingsForm({
 	workspaceId,
 	name,
@@ -15,7 +13,6 @@ export function WorkspaceSettingsForm({
 	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
-
 	return (
 		<section className="panel p-4">
 			<h2 className="text-sm font-semibold">Settings</h2>

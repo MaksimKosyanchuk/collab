@@ -8,40 +8,48 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser, AuthUser } from './current-user.decorator';
-
 const REFRESH_COOKIE = 'refreshToken';
-
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
 	constructor(private readonly auth: AuthService) {}
-
 	@Post('register')
-	@Throttle({ default: { limit: 5, ttl: 60_000 } })
+	@Throttle({ default: { limit: 5, ttl: 60000 } })
 	@ApiOperation({ summary: 'Register a new user' })
-	async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+	async register(
+		@Body()
+		dto: RegisterDto,
+		@Res({ passthrough: true })
+		res: Response,
+	) {
 		const tokens = await this.auth.register(dto);
 		this.setRefreshCookie(res, tokens.refreshToken);
 		return tokens;
 	}
-
 	@Post('login')
 	@HttpCode(200)
-	@Throttle({ default: { limit: 10, ttl: 60_000 } })
+	@Throttle({ default: { limit: 10, ttl: 60000 } })
 	@ApiOperation({ summary: 'Log in and receive tokens' })
-	async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+	async login(
+		@Body()
+		dto: LoginDto,
+		@Res({ passthrough: true })
+		res: Response,
+	) {
 		const tokens = await this.auth.login(dto);
 		this.setRefreshCookie(res, tokens.refreshToken);
 		return tokens;
 	}
-
 	@Post('refresh')
 	@HttpCode(200)
 	@ApiOperation({ summary: 'Refresh access token' })
 	async refresh(
-		@Body() dto: RefreshDto,
-		@Req() req: Request,
-		@Res({ passthrough: true }) res: Response,
+		@Body()
+		dto: RefreshDto,
+		@Req()
+		req: Request,
+		@Res({ passthrough: true })
+		res: Response,
 	) {
 		const cookieToken =
 			typeof req.cookies?.[REFRESH_COOKIE] === 'string'
@@ -51,16 +59,18 @@ export class AuthController {
 		this.setRefreshCookie(res, tokens.refreshToken);
 		return tokens;
 	}
-
 	@Post('logout')
 	@HttpCode(204)
 	@ApiBearerAuth('JWT-auth')
 	@UseGuards(JwtAuthGuard)
 	@ApiOperation({ summary: 'Log out and clear refresh cookie' })
 	async logout(
-		@Body() dto: RefreshDto,
-		@Req() req: Request,
-		@Res({ passthrough: true }) res: Response,
+		@Body()
+		dto: RefreshDto,
+		@Req()
+		req: Request,
+		@Res({ passthrough: true })
+		res: Response,
 	) {
 		const cookieToken =
 			typeof req.cookies?.[REFRESH_COOKIE] === 'string'
@@ -69,15 +79,16 @@ export class AuthController {
 		await this.auth.logout(dto.refreshToken ?? cookieToken);
 		res.clearCookie(REFRESH_COOKIE);
 	}
-
 	@Get('me')
 	@ApiBearerAuth('JWT-auth')
 	@UseGuards(JwtAuthGuard)
 	@ApiOperation({ summary: 'Get current authenticated user' })
-	me(@CurrentUser() user: AuthUser) {
+	me(
+		@CurrentUser()
+		user: AuthUser,
+	) {
 		return user;
 	}
-
 	private setRefreshCookie(res: Response, token: string) {
 		res.cookie(REFRESH_COOKIE, token, {
 			httpOnly: true,

@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useTransition } from 'react';
 import {
 	createPublicLinkAction,
@@ -16,17 +15,14 @@ import type {
 	DocumentShareInvitation,
 	WorkspaceMember,
 } from '@/lib/types';
-
 const ACCESS_EDIT = 2;
 const ACCESS_MANAGE = 3;
-
 function appOrigin() {
 	if (typeof window !== 'undefined') {
 		return window.location.origin;
 	}
 	return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 }
-
 export function DocumentAccessPanel({
 	workspaceId,
 	documentId,
@@ -37,7 +33,6 @@ export function DocumentAccessPanel({
 	documentId: string;
 	initial: DocumentDetail;
 	members?: WorkspaceMember[];
-	/** False when editor is offline — publish would miss unsynced local edits. */
 	liveReady?: boolean;
 }) {
 	const [doc, setDoc] = useState(initial);
@@ -50,12 +45,10 @@ export function DocumentAccessPanel({
 	const [freshLink, setFreshLink] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
 	const [invitations, setInvitations] = useState(initial.shareInvitations ?? []);
-
 	const canEdit = doc.access >= ACCESS_EDIT;
 	const canManage = doc.access >= ACCESS_MANAGE;
 	const published = doc.publicationStatus === 'PUBLISHED';
 	const publicUrl = doc.publicSlug ? `${appOrigin()}/p/${doc.publicSlug}` : null;
-
 	function run(task: () => Promise<void>) {
 		setError(null);
 		setMessage(null);
@@ -67,7 +60,6 @@ export function DocumentAccessPanel({
 			}
 		});
 	}
-
 	return (
 		<div className="space-y-5 border-t border-line pt-4">
 			<div>

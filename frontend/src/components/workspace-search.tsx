@@ -1,27 +1,22 @@
 'use client';
-
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { messageFromUnknown } from '@/lib/errors';
-
 type SearchHit = {
 	id: string;
 	title: string;
 	plainText?: string;
 };
-
 export function WorkspaceSearch({ workspaceId }: { workspaceId: string }) {
 	const [query, setQuery] = useState('');
 	const [debounced, setDebounced] = useState('');
 	const [hits, setHits] = useState<SearchHit[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-
 	useEffect(() => {
 		const timer = window.setTimeout(() => setDebounced(query.trim()), 300);
 		return () => window.clearTimeout(timer);
 	}, [query]);
-
 	useEffect(() => {
 		if (!debounced) {
 			setHits([]);
@@ -29,16 +24,13 @@ export function WorkspaceSearch({ workspaceId }: { workspaceId: string }) {
 			setLoading(false);
 			return;
 		}
-
 		let cancelled = false;
 		setLoading(true);
 		setError(null);
-
 		const params = new URLSearchParams({
 			workspaceId,
 			q: debounced,
 		});
-
 		fetch(`/api/search?${params.toString()}`)
 			.then(async (res) => {
 				const body = await res.json();
@@ -63,12 +55,10 @@ export function WorkspaceSearch({ workspaceId }: { workspaceId: string }) {
 			.finally(() => {
 				if (!cancelled) setLoading(false);
 			});
-
 		return () => {
 			cancelled = true;
 		};
 	}, [debounced, workspaceId]);
-
 	return (
 		<div className="mt-3 space-y-2 border-t border-line pt-3">
 			<label className="block">

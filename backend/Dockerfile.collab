@@ -19,5 +19,4 @@ COPY prisma ./prisma
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 EXPOSE 3002
-# Migrations run in the API container; collab only serves WS + control plane.
 CMD ["node", "dist/collab-main"]

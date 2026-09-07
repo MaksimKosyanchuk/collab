@@ -7,7 +7,6 @@ export function slugify(value: string, suffix: string): string {
 			.slice(0, 40) || 'item';
 	return `${base}-${suffix}`;
 }
-
 export function nextRank(previous?: string | null): string {
 	if (!previous) {
 		return 'a0';

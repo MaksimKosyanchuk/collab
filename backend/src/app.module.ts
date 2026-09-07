@@ -18,12 +18,11 @@ import { MetricsModule } from './metrics/metrics.module';
 import { QueueModule } from './queue/queue.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { CorrelationInterceptor } from './common/interceptors/correlation.interceptor';
-
 @Module({
 	imports: [
 		ConfigModule.forRoot({ isGlobal: true }),
 		ThrottlerModule.forRoot({
-			throttlers: [{ ttl: 60_000, limit: 120 }],
+			throttlers: [{ ttl: 60000, limit: 120 }],
 		}),
 		PrismaModule,
 		LoggerModule,

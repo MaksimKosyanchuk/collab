@@ -1,13 +1,10 @@
 import sanitizeHtml from 'sanitize-html';
 import * as Y from 'yjs';
 import { isBlockType, ProjectedBlock } from './block-schema';
-
 const strip = { allowedTags: [] as string[], allowedAttributes: {} };
-
 function clean(value: unknown): string {
 	return sanitizeHtml(String(value ?? ''), strip);
 }
-
 export function projectYDoc(ydoc: Y.Doc): {
 	title: string;
 	description: string;

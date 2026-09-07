@@ -1,5 +1,4 @@
 'use client';
-
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
@@ -8,7 +7,6 @@ import {
 	respondDocumentShareInviteAction,
 	respondWorkspaceInviteAction,
 } from '@/lib/actions';
-
 type NotificationItem = {
 	id: string;
 	type: string;
@@ -27,7 +25,6 @@ type NotificationItem = {
 	readAt: string | null;
 	createdAt: string;
 };
-
 function labelFor(item: NotificationItem) {
 	if (item.type === 'INVITE') {
 		const workspace = item.payload.workspaceName ?? 'a workspace';
@@ -46,28 +43,23 @@ function labelFor(item: NotificationItem) {
 	}
 	return item.type;
 }
-
 export function NotificationsBell() {
 	const router = useRouter();
 	const [items, setItems] = useState<NotificationItem[]>([]);
 	const [open, setOpen] = useState(false);
 	const [pending, startTransition] = useTransition();
 	const [error, setError] = useState<string | null>(null);
-
 	async function reload() {
 		const res = await fetch('/api/notifications', { cache: 'no-store' });
 		if (!res.ok) return;
 		setItems((await res.json()) as NotificationItem[]);
 	}
-
 	useEffect(() => {
 		void reload();
-		const timer = setInterval(() => void reload(), 15_000);
+		const timer = setInterval(() => void reload(), 15000);
 		return () => clearInterval(timer);
 	}, []);
-
 	const unread = items.filter((item) => !item.readAt).length;
-
 	function respondWorkspace(item: NotificationItem, action: 'accept' | 'decline') {
 		const invitationId = item.payload.invitationId;
 		if (!invitationId) return;
@@ -87,7 +79,6 @@ export function NotificationsBell() {
 			}
 		});
 	}
-
 	function respondShare(item: NotificationItem, action: 'accept' | 'decline') {
 		const invitationId = item.payload.invitationId;
 		if (!invitationId) return;
@@ -107,7 +98,6 @@ export function NotificationsBell() {
 			}
 		});
 	}
-
 	return (
 		<div className="relative">
 			<button
@@ -128,9 +118,7 @@ export function NotificationsBell() {
 							{items.slice(0, 20).map((item) => (
 								<li
 									key={item.id}
-									className={`rounded-md px-2 py-1.5 text-[13px] ${
-										item.readAt ? 'text-muted' : 'bg-neutral-50'
-									}`}
+									className={`rounded-md px-2 py-1.5 text-[13px] ${item.readAt ? 'text-muted' : 'bg-neutral-50'}`}
 								>
 									<p className="font-medium">{labelFor(item)}</p>
 									<p className="text-[11px] text-muted">

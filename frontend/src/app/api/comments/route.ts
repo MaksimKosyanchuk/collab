@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ACCESS_COOKIE, apiFetch } from '@/lib/api';
-
 export async function GET(request: Request) {
 	const { searchParams } = new URL(request.url);
 	const documentId = searchParams.get('documentId');

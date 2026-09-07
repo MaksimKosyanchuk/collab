@@ -1,7 +1,5 @@
 'use client';
-
 import Link from 'next/link';
-
 export function RouteError({
 	title,
 	message,
@@ -31,7 +29,6 @@ export function RouteError({
 		</div>
 	);
 }
-
 export function RouteLoading({ label }: { label: string }) {
 	return <div className="mx-auto max-w-5xl panel empty p-4 text-[13px]">{label}</div>;
 }

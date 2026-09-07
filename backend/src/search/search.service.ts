@@ -3,13 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { MeiliSearch } from 'meilisearch';
 import { AccessService } from '../access/access.service';
 import { PrismaService } from '../prisma/prisma.service';
-
 const INDEX = 'documents';
-
 @Injectable()
 export class SearchService implements OnModuleInit {
 	private readonly client: MeiliSearch;
-
 	constructor(
 		private readonly config: ConfigService,
 		private readonly prisma: PrismaService,
@@ -20,17 +17,15 @@ export class SearchService implements OnModuleInit {
 			apiKey: this.config.get('MEILI_API_KEY'),
 		});
 	}
-
 	async onModuleInit(): Promise<void> {
 		try {
 			const index = this.client.index(INDEX);
 			await index.updateFilterableAttributes(['workspaceId', 'documentId']);
 			await index.updateSearchableAttributes(['title', 'plainText']);
 		} catch {
-			// Meilisearch may be down during unit tests / first boot
+			void 0;
 		}
 	}
-
 	async indexDocument(documentId: string): Promise<void> {
 		const document = await this.prisma.document.findUnique({
 			where: { id: documentId },
@@ -53,10 +48,13 @@ export class SearchService implements OnModuleInit {
 			},
 		]);
 	}
-
 	async search(workspaceId: string, userId: string, query: string) {
 		await this.access.assertWorkspaceMember(workspaceId, userId);
-		let hits: Array<{ id: string; title: string; plainText: string }> = [];
+		let hits: Array<{
+			id: string;
+			title: string;
+			plainText: string;
+		}> = [];
 		try {
 			const result = await this.client.index(INDEX).search(query, {
 				filter: `workspaceId = "${workspaceId}"`,
@@ -82,14 +80,13 @@ export class SearchService implements OnModuleInit {
 				plainText: row.projection?.plainText ?? '',
 			}));
 		}
-
 		const visible = [];
 		for (const hit of hits) {
 			try {
 				await this.access.assertDocumentView(hit.id, { userId });
 				visible.push(hit);
 			} catch {
-				// drop hits the user cannot see
+				void 0;
 			}
 		}
 		return visible;

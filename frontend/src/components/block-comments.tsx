@@ -1,13 +1,14 @@
 'use client';
-
 import { useEffect, useState, useTransition } from 'react';
 import {
 	addCommentAction,
 	createCommentThreadAction,
 	resolveCommentThreadAction,
 } from '@/lib/actions';
-
-type CommentAuthor = { id: string; displayName: string };
+type CommentAuthor = {
+	id: string;
+	displayName: string;
+};
 type Comment = {
 	id: string;
 	body: string;
@@ -20,7 +21,6 @@ type Thread = {
 	resolvedAt: string | null;
 	comments: Comment[];
 };
-
 export function BlockComments({
 	documentId,
 	blockId,
@@ -37,7 +37,6 @@ export function BlockComments({
 	const [error, setError] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
 	const [open, setOpen] = useState(false);
-
 	useEffect(() => {
 		let cancelled = false;
 		void (async () => {
@@ -51,16 +50,14 @@ export function BlockComments({
 					setThreads(all.filter((thread) => thread.blockId === blockId));
 				}
 			} catch {
-				// ignore
+				void 0;
 			}
 		})();
 		return () => {
 			cancelled = true;
 		};
 	}, [documentId, blockId]);
-
 	const openThreads = threads.filter((thread) => !thread.resolvedAt);
-
 	return (
 		<div className="mt-1">
 			<button

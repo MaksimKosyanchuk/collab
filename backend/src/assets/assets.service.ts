@@ -7,14 +7,11 @@ import { PlanLimitException } from '../common/exceptions/plan-limit.exception';
 import { PLAN_LIMITS } from '../common/plan-limits';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfirmAssetDto, PresignAssetDto } from './dto/asset.dto';
-
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
-
 @Injectable()
 export class AssetsService implements OnModuleInit {
 	private readonly client: MinioClient;
 	private readonly bucket: string;
-
 	constructor(
 		private readonly config: ConfigService,
 		private readonly prisma: PrismaService,
@@ -29,7 +26,6 @@ export class AssetsService implements OnModuleInit {
 			secretKey: this.config.get('MINIO_SECRET_KEY', 'minio12345'),
 		});
 	}
-
 	async onModuleInit(): Promise<void> {
 		try {
 			const exists = await this.client.bucketExists(this.bucket);
@@ -37,10 +33,9 @@ export class AssetsService implements OnModuleInit {
 				await this.client.makeBucket(this.bucket);
 			}
 		} catch {
-			// MinIO may be down in unit tests
+			void 0;
 		}
 	}
-
 	async presign(workspaceId: string, userId: string, dto: PresignAssetDto) {
 		await this.access.assertWorkspaceMember(workspaceId, userId);
 		this.assertMime(dto.mimeType);
@@ -57,7 +52,6 @@ export class AssetsService implements OnModuleInit {
 			bucket: this.bucket,
 		};
 	}
-
 	async confirm(workspaceId: string, userId: string, dto: ConfirmAssetDto) {
 		await this.access.assertWorkspaceMember(workspaceId, userId);
 		this.assertMime(dto.mimeType);
@@ -91,8 +85,6 @@ export class AssetsService implements OnModuleInit {
 		const url = await this.client.presignedGetObject(this.bucket, dto.objectKey, 60 * 60);
 		return { ...asset, url: this.publicizeUrl(url) };
 	}
-
-	/** Browser-facing host when MinIO is reached as an internal Docker hostname. */
 	private publicizeUrl(url: string): string {
 		const publicHost = this.config.get<string>('MINIO_PUBLIC_ENDPOINT');
 		if (!publicHost) {
@@ -105,13 +97,11 @@ export class AssetsService implements OnModuleInit {
 			.replace(`://${internal}:${port}`, `://${publicHost}:${publicPort}`)
 			.replace(`://${internal}/`, `://${publicHost}:${publicPort}/`);
 	}
-
 	private assertMime(mimeType: string) {
 		if (!ALLOWED.has(mimeType)) {
 			throw new BadRequestException('Unsupported file type');
 		}
 	}
-
 	private async assertStorage(workspaceId: string, extraBytes: number) {
 		const workspace = await this.prisma.workspace.findUniqueOrThrow({
 			where: { id: workspaceId },
@@ -122,7 +112,6 @@ export class AssetsService implements OnModuleInit {
 		}
 	}
 }
-
 function extOf(mime: string): string {
 	if (mime === 'image/png') return '.png';
 	if (mime === 'image/jpeg') return '.jpg';

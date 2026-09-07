@@ -2,30 +2,28 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-
 @Injectable()
 export class OutboxDispatcher implements OnModuleInit, OnModuleDestroy {
 	private timer?: NodeJS.Timeout;
-
 	constructor(
 		private readonly prisma: PrismaService,
-		@InjectQueue('search-sync') private readonly searchQueue: Queue,
-		@InjectQueue('revalidate') private readonly revalidateQueue: Queue,
-		@InjectQueue('notifications') private readonly notificationsQueue: Queue,
+		@InjectQueue('search-sync')
+		private readonly searchQueue: Queue,
+		@InjectQueue('revalidate')
+		private readonly revalidateQueue: Queue,
+		@InjectQueue('notifications')
+		private readonly notificationsQueue: Queue,
 	) {}
-
 	onModuleInit(): void {
 		this.timer = setInterval(() => {
 			void this.drain();
 		}, 2000);
 	}
-
 	onModuleDestroy(): void {
 		if (this.timer) {
 			clearInterval(this.timer);
 		}
 	}
-
 	async drain(): Promise<void> {
 		const events = await this.prisma.outboxEvent.findMany({
 			where: { status: 'PENDING', availableAt: { lte: new Date() } },
@@ -41,7 +39,6 @@ export class OutboxDispatcher implements OnModuleInit, OnModuleDestroy {
 				continue;
 			}
 			try {
-				// BullMQ custom job ids cannot contain ":".
 				const jobId = event.idempotencyKey.replace(/:/g, '_');
 				if (event.type.startsWith('search.')) {
 					await this.searchQueue.add(event.type, event.payload, {

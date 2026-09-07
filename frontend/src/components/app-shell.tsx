@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { logoutAction } from '@/lib/actions';
 import { NotificationsBell } from '@/components/notifications-bell';
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
 	return (
 		<div className="min-h-screen">

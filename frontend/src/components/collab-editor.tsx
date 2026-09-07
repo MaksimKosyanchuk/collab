@@ -1,5 +1,4 @@
 'use client';
-
 import Link from 'next/link';
 import { useState } from 'react';
 import { DocumentAccessPanel } from '@/components/document-access-panel';
@@ -12,7 +11,6 @@ import { BLOCK_TYPES, type BlockType } from '@/lib/blocks';
 import { connectionStatusLabel, messageFromUnknown } from '@/lib/errors';
 import { useCollabDoc } from '@/hooks/use-collab-doc';
 import type { DocumentDetail, WorkspaceMember } from '@/lib/types';
-
 async function uploadImageFile(
 	workspaceId: string,
 	documentId: string,
@@ -26,7 +24,6 @@ async function uploadImageFile(
 	if (!presign.ok) {
 		throw new Error(presign.error);
 	}
-
 	const put = await fetch(presign.data.uploadUrl, {
 		method: 'PUT',
 		body: file,
@@ -37,7 +34,6 @@ async function uploadImageFile(
 	if (!put.ok) {
 		throw new Error('Upload to storage failed');
 	}
-
 	const confirmed = await confirmAssetAction(workspaceId, {
 		objectKey: presign.data.objectKey,
 		mimeType: file.type || 'image/png',
@@ -49,7 +45,6 @@ async function uploadImageFile(
 	}
 	return confirmed.data.url;
 }
-
 function ImageBlockFields({
 	workspaceId,
 	documentId,
@@ -67,7 +62,6 @@ function ImageBlockFields({
 }) {
 	const { show } = useToast();
 	const [uploading, setUploading] = useState(false);
-
 	async function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
 		const file = event.target.files?.[0];
 		event.target.value = '';
@@ -83,7 +77,6 @@ function ImageBlockFields({
 			setUploading(false);
 		}
 	}
-
 	return (
 		<div className="space-y-2">
 			<input
@@ -105,14 +98,10 @@ function ImageBlockFields({
 					/>
 				</label>
 			) : null}
-			{src ? (
-				// eslint-disable-next-line @next/next/no-img-element
-				<img src={src} alt={text || ''} className="max-h-64 rounded-md" />
-			) : null}
+			{src ? <img src={src} alt={text || ''} className="max-h-64 rounded-md" /> : null}
 		</div>
 	);
 }
-
 export function CollabEditor({
 	workspaceId,
 	documentId,
@@ -142,7 +131,6 @@ export function CollabEditor({
 		removeBlock,
 		setCursor,
 	} = useCollabDoc(documentId, shareToken);
-
 	if (conn === 'deleted') {
 		return (
 			<div className="panel p-5">
@@ -156,7 +144,6 @@ export function CollabEditor({
 			</div>
 		);
 	}
-
 	if (conn === 'revoked') {
 		return (
 			<div className="panel p-5">
@@ -170,7 +157,6 @@ export function CollabEditor({
 			</div>
 		);
 	}
-
 	const status = connectionStatusLabel({ conn, browserOnline });
 	const editable = canEdit && conn === 'online' && browserOnline;
 	const others = presence.filter((user) => user.userId !== localUserId);
@@ -180,7 +166,6 @@ export function CollabEditor({
 			: status.tone === 'muted'
 				? 'text-sm font-medium text-muted'
 				: 'text-sm font-medium';
-
 	return (
 		<div className="grid gap-3 lg:grid-cols-[220px_1fr]">
 			<aside className="panel space-y-3 p-3">

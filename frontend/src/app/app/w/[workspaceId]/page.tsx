@@ -3,11 +3,11 @@ import { DocumentTree } from '@/components/document-tree';
 import { serverApi } from '@/lib/server-api';
 import { getCachedWorkspaceTree } from '@/lib/workspace-tree';
 import type { AuthUser, WorkspaceDetail } from '@/lib/types';
-
 type Props = {
-	params: Promise<{ workspaceId: string }>;
+	params: Promise<{
+		workspaceId: string;
+	}>;
 };
-
 function StatsSkeleton() {
 	return (
 		<div className="mx-auto max-w-5xl panel empty p-4 text-[13px] text-muted">
@@ -15,7 +15,6 @@ function StatsSkeleton() {
 		</div>
 	);
 }
-
 function DocsSkeleton() {
 	return (
 		<div className="mx-auto max-w-5xl panel empty p-4 text-[13px] text-muted">
@@ -23,7 +22,6 @@ function DocsSkeleton() {
 		</div>
 	);
 }
-
 async function WorkspaceStats({ workspaceId }: { workspaceId: string }) {
 	try {
 		const workspace = await serverApi<WorkspaceDetail>(`/workspaces/${workspaceId}`);
@@ -48,7 +46,6 @@ async function WorkspaceStats({ workspaceId }: { workspaceId: string }) {
 		);
 	}
 }
-
 async function WorkspaceMain({ workspaceId }: { workspaceId: string }) {
 	try {
 		const [workspace, documents, me] = await Promise.all([
@@ -56,7 +53,6 @@ async function WorkspaceMain({ workspaceId }: { workspaceId: string }) {
 			getCachedWorkspaceTree(workspaceId),
 			serverApi<AuthUser>('/auth/me'),
 		]);
-
 		return <DocumentTree workspace={workspace} documents={documents} currentUserId={me.id} />;
 	} catch (error) {
 		return (
@@ -68,10 +64,8 @@ async function WorkspaceMain({ workspaceId }: { workspaceId: string }) {
 		);
 	}
 }
-
 export default async function WorkspacePage({ params }: Props) {
 	const { workspaceId } = await params;
-
 	return (
 		<div className="space-y-3">
 			<Suspense fallback={<StatsSkeleton />}>

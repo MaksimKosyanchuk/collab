@@ -10,25 +10,30 @@ import { canEdit } from '../access/access.policy';
 import { JwtPayload } from '../auth/jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { CollabRoomsService, RoomClient } from './collab-rooms.service';
-
 type JoinMessage = {
 	type: 'join';
 	documentId: string;
 	token?: string;
 	shareToken?: string;
 };
-
 type ClientMessage =
 	| JoinMessage
-	| { type: 'update'; update: string }
-	| { type: 'cursor'; blockId: string; offset: number }
-	| { type: 'cursor-clear' };
-
+	| {
+			type: 'update';
+			update: string;
+	  }
+	| {
+			type: 'cursor';
+			blockId: string;
+			offset: number;
+	  }
+	| {
+			type: 'cursor-clear';
+	  };
 @WebSocketGateway({ path: '/collab' })
 export class CollabGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	private readonly logger = new Logger(CollabGateway.name);
 	private readonly clients = new Map<WebSocket, RoomClient>();
-
 	constructor(
 		private readonly jwt: JwtService,
 		private readonly config: ConfigService,
@@ -36,7 +41,6 @@ export class CollabGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		private readonly rooms: CollabRoomsService,
 		private readonly prisma: PrismaService,
 	) {}
-
 	handleConnection(socket: WebSocket, request: IncomingMessage): void {
 		socket.on('message', (raw) => {
 			void this.onMessage(socket, raw.toString());
@@ -54,11 +58,9 @@ export class CollabGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			});
 		}
 	}
-
 	handleDisconnect(socket: WebSocket): void {
 		this.leave(socket);
 	}
-
 	private async onMessage(socket: WebSocket, raw: string): Promise<void> {
 		let message: ClientMessage;
 		try {
@@ -88,13 +90,11 @@ export class CollabGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			this.clients.delete(socket);
 			return;
 		}
-
 		const accessState = await this.rooms.revalidateClient(room, client);
 		if (accessState === 'kicked') {
 			this.clients.delete(socket);
 			return;
 		}
-
 		if (message.type === 'update') {
 			this.rooms.applyClientUpdate(room, client, message.update);
 			return;
@@ -110,12 +110,10 @@ export class CollabGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			this.rooms.setCursor(room, client, null);
 		}
 	}
-
 	private async join(socket: WebSocket, message: JoinMessage): Promise<void> {
 		try {
 			let userId: string;
 			let displayName: string;
-
 			if (message.token) {
 				const payload = await this.jwt.verifyAsync<JwtPayload>(message.token, {
 					secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
@@ -136,7 +134,6 @@ export class CollabGateway implements OnGatewayConnection, OnGatewayDisconnect {
 				socket.close(4401, 'Unauthorized');
 				return;
 			}
-
 			const resolved = await this.access.assertDocumentView(message.documentId, {
 				userId: message.token ? userId : null,
 				shareToken: message.shareToken,
@@ -168,7 +165,6 @@ export class CollabGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			socket.close(4401, 'Unauthorized');
 		}
 	}
-
 	private leave(socket: WebSocket): void {
 		const client = this.clients.get(socket);
 		if (!client) {

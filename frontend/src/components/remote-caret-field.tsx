@@ -1,5 +1,4 @@
 'use client';
-
 import {
 	useEffect,
 	useLayoutEffect,
@@ -9,9 +8,11 @@ import {
 	type TextareaHTMLAttributes,
 } from 'react';
 import type { PresenceUser } from '@/lib/blocks';
-
-type CaretPos = { top: number; left: number; height: number };
-
+type CaretPos = {
+	top: number;
+	left: number;
+	height: number;
+};
 function measureCaret(textarea: HTMLTextAreaElement, offset: number): CaretPos {
 	const style = window.getComputedStyle(textarea);
 	const mirror = document.createElement('div');
@@ -34,28 +35,23 @@ function measureCaret(textarea: HTMLTextAreaElement, offset: number): CaretPos {
 		'top:0',
 		'left:-9999px',
 	].join(';');
-
 	const clamped = Math.max(0, Math.min(offset, textarea.value.length));
 	mirror.textContent = textarea.value.slice(0, clamped);
-
 	const marker = document.createElement('span');
 	marker.textContent = textarea.value.slice(clamped) || '.';
 	mirror.appendChild(marker);
 	document.body.appendChild(mirror);
-
 	const lineHeight =
 		Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.2 || 18;
 	const top = marker.offsetTop - textarea.scrollTop;
 	const left = marker.offsetLeft - textarea.scrollLeft;
 	document.body.removeChild(mirror);
-
 	return {
 		top: Math.max(0, top),
 		left: Math.max(0, left),
 		height: lineHeight,
 	};
 }
-
 export function RemoteCaretField({
 	blockId,
 	value,
@@ -74,8 +70,13 @@ export function RemoteCaretField({
 	'value' | 'onSelect' | 'className' | 'onKeyUp' | 'onClick' | 'onScroll'
 >) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	const [carets, setCarets] = useState<Array<PresenceUser & { pos: CaretPos }>>([]);
-
+	const [carets, setCarets] = useState<
+		Array<
+			PresenceUser & {
+				pos: CaretPos;
+			}
+		>
+	>([]);
 	const caretSignature = useMemo(
 		() =>
 			remoteUsers
@@ -85,7 +86,6 @@ export function RemoteCaretField({
 				.join('|'),
 		[remoteUsers, blockId],
 	);
-
 	useLayoutEffect(() => {
 		const el = textareaRef.current;
 		if (!el) {
@@ -100,11 +100,9 @@ export function RemoteCaretField({
 			}));
 		setCarets(next);
 	}, [blockId, value, caretSignature, remoteUsers]);
-
 	useEffect(() => {
 		const el = textareaRef.current;
 		if (!el) return;
-
 		const recompute = () => {
 			const next = remoteUsers
 				.filter((user) => user.cursor?.blockId === blockId)
@@ -114,7 +112,6 @@ export function RemoteCaretField({
 				}));
 			setCarets(next);
 		};
-
 		el.addEventListener('scroll', recompute);
 		window.addEventListener('resize', recompute);
 		return () => {
@@ -122,18 +119,15 @@ export function RemoteCaretField({
 			window.removeEventListener('resize', recompute);
 		};
 	}, [blockId, remoteUsers]);
-
 	function reportCursor(target: HTMLTextAreaElement) {
 		onCursor(blockId, target.selectionStart);
 	}
-
 	const visibleCarets = carets.filter((user) => {
 		const el = textareaRef.current;
 		if (!el) return false;
 		return user.pos.top > -4 && user.pos.top < el.clientHeight;
 	});
 	const labelPad = visibleCarets.length > 0;
-
 	return (
 		<div className={`relative overflow-visible ${labelPad ? 'pt-4' : ''}`}>
 			<textarea

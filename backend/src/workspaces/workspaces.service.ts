@@ -9,23 +9,21 @@ import { PLAN_LIMITS } from '../common/plan-limits';
 import { PrismaService } from '../prisma/prisma.service';
 import { OutboxService } from '../queue/outbox.service';
 import { CreateWorkspaceDto, InviteMemberDto } from './dto/workspace.dto';
-
 function toWorkspaceDto(workspace: Workspace) {
 	return {
 		...workspace,
 		storageUsedBytes: workspace.storageUsedBytes.toString(),
 	};
 }
-
 @Injectable()
 export class WorkspacesService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly access: AccessService,
 		private readonly outbox: OutboxService,
-		@Inject(COLLAB_CONTROL) private readonly rooms: CollabControl,
+		@Inject(COLLAB_CONTROL)
+		private readonly rooms: CollabControl,
 	) {}
-
 	async create(userId: string, dto: CreateWorkspaceDto) {
 		const slug = slugify(dto.name, randomBytes(3).toString('hex'));
 		return this.prisma.$transaction(async (tx) => {
@@ -46,7 +44,6 @@ export class WorkspacesService {
 			return toWorkspaceDto(workspace);
 		});
 	}
-
 	async listForUser(userId: string) {
 		const rows = await this.prisma.workspace.findMany({
 			where: { members: { some: { userId } } },
@@ -54,7 +51,6 @@ export class WorkspacesService {
 		});
 		return rows.map(toWorkspaceDto);
 	}
-
 	async get(workspaceId: string, userId: string) {
 		await this.access.assertWorkspaceMember(workspaceId, userId);
 		const workspace = await this.prisma.workspace.findUnique({
@@ -95,7 +91,6 @@ export class WorkspacesService {
 			subscription: workspace.subscription,
 		};
 	}
-
 	async rename(workspaceId: string, userId: string, name: string) {
 		await this.access.assertWorkspaceManage(workspaceId, userId);
 		const trimmed = name.trim();
@@ -108,7 +103,6 @@ export class WorkspacesService {
 		});
 		return toWorkspaceDto(workspace);
 	}
-
 	async invite(workspaceId: string, userId: string, dto: InviteMemberDto) {
 		await this.access.assertWorkspaceManage(workspaceId, userId);
 		if (dto.role === WorkspaceRole.OWNER) {
@@ -128,7 +122,6 @@ export class WorkspacesService {
 			},
 		});
 		await this.assertMemberLimit(workspace.id, workspace.plan);
-
 		const existingUser = await this.prisma.user.findUnique({
 			where: { email },
 			select: { id: true, email: true, displayName: true },
@@ -136,7 +129,6 @@ export class WorkspacesService {
 		if (!existingUser) {
 			throw new NotFoundException('User not found');
 		}
-
 		const member = await this.prisma.workspaceMember.findUnique({
 			where: {
 				workspaceId_userId: { workspaceId, userId: existingUser.id },
@@ -145,7 +137,6 @@ export class WorkspacesService {
 		if (member) {
 			throw new BadRequestException('User is already a member');
 		}
-
 		const pending = await this.prisma.workspaceInvitation.findFirst({
 			where: { workspaceId, email, status: 'PENDING' },
 			orderBy: { createdAt: 'desc' },
@@ -159,7 +150,6 @@ export class WorkspacesService {
 				data: { status: 'REVOKED' },
 			});
 		}
-
 		const inviterName = workspace.members[0]?.user.displayName ?? 'A workspace admin';
 		const token = randomBytes(24).toString('base64url');
 		const invitation = await this.prisma.workspaceInvitation.create({
@@ -172,7 +162,6 @@ export class WorkspacesService {
 				expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
 			},
 		});
-
 		await this.outbox.enqueue({
 			type: 'notification.invite',
 			aggregateType: 'workspace',
@@ -196,7 +185,6 @@ export class WorkspacesService {
 			displayName: existingUser.displayName,
 		};
 	}
-
 	async acceptInvite(userId: string, userEmail: string, token: string) {
 		const invitation = await this.prisma.workspaceInvitation.findUnique({
 			where: { tokenHash: hashToken(token) },
@@ -204,7 +192,6 @@ export class WorkspacesService {
 		});
 		return this.acceptInvitationRecord(userId, userEmail, invitation);
 	}
-
 	async respondInvite(
 		userId: string,
 		userEmail: string,
@@ -220,7 +207,6 @@ export class WorkspacesService {
 		}
 		return this.acceptInvitationRecord(userId, userEmail, invitation);
 	}
-
 	private async acceptInvitationRecord(
 		userId: string,
 		userEmail: string,
@@ -231,7 +217,10 @@ export class WorkspacesService {
 			status: string;
 			expiresAt: Date;
 			workspaceId: string;
-			workspace: { name: string; plan: PlanTier };
+			workspace: {
+				name: string;
+				plan: PlanTier;
+			};
 		} | null,
 	) {
 		if (!invitation || invitation.status !== 'PENDING' || invitation.expiresAt < new Date()) {
@@ -241,7 +230,6 @@ export class WorkspacesService {
 			throw new BadRequestException('Sign in with the invited email to accept this invite');
 		}
 		await this.assertMemberLimit(invitation.workspaceId, invitation.workspace.plan);
-
 		const member = await this.prisma.$transaction(async (tx) => {
 			await tx.workspaceInvitation.update({
 				where: { id: invitation.id },
@@ -262,7 +250,6 @@ export class WorkspacesService {
 				},
 			});
 		});
-
 		return {
 			status: 'accepted' as const,
 			workspaceId: invitation.workspaceId,
@@ -270,7 +257,6 @@ export class WorkspacesService {
 			role: member.role,
 		};
 	}
-
 	private async declineInvitationRecord(
 		_userId: string,
 		userEmail: string,
@@ -280,7 +266,9 @@ export class WorkspacesService {
 			status: string;
 			expiresAt: Date;
 			workspaceId: string;
-			workspace: { name: string };
+			workspace: {
+				name: string;
+			};
 		} | null,
 	) {
 		if (!invitation || invitation.status !== 'PENDING' || invitation.expiresAt < new Date()) {
@@ -299,7 +287,6 @@ export class WorkspacesService {
 			workspaceName: invitation.workspace.name,
 		};
 	}
-
 	async updateMemberRole(
 		workspaceId: string,
 		actorId: string,
@@ -327,7 +314,6 @@ export class WorkspacesService {
 		await this.rooms.revalidateUserInWorkspace(workspaceId, memberUserId);
 		return updated;
 	}
-
 	async removeMember(workspaceId: string, actorId: string, memberUserId: string) {
 		await this.access.assertWorkspaceManage(workspaceId, actorId);
 		const member = await this.prisma.workspaceMember.findUnique({
@@ -340,12 +326,9 @@ export class WorkspacesService {
 			throw new BadRequestException('Cannot remove the owner');
 		}
 		await this.assertNotLastManager(workspaceId, memberUserId, null);
-		// DocumentShare rows are kept: user may still open pages shared
-		// explicitly without workspace membership (external document access).
 		await this.prisma.workspaceMember.delete({ where: { id: member.id } });
 		await this.rooms.revalidateUserInWorkspace(workspaceId, memberUserId);
 	}
-
 	async leave(workspaceId: string, userId: string) {
 		const member = await this.prisma.workspaceMember.findUnique({
 			where: { workspaceId_userId: { workspaceId, userId } },
@@ -359,16 +342,10 @@ export class WorkspacesService {
 			);
 		}
 		await this.assertNotLastManager(workspaceId, userId, null);
-		// Keep DocumentShare: leaving the workspace does not revoke page-level shares.
 		await this.prisma.workspaceMember.delete({ where: { id: member.id } });
 		await this.rooms.revalidateUserInWorkspace(workspaceId, userId);
 		return { left: true, workspaceId };
 	}
-
-	/**
-	 * Keep at least one OWNER/ADMIN. Demotion/removal/leave of a manager is
-	 * blocked when they are the last remaining manager.
-	 */
 	private async assertNotLastManager(
 		workspaceId: string,
 		memberUserId: string,
@@ -393,7 +370,6 @@ export class WorkspacesService {
 			throw new BadRequestException('Cannot remove or demote the last workspace admin');
 		}
 	}
-
 	private async assertMemberLimit(workspaceId: string, plan: PlanTier) {
 		const count = await this.prisma.workspaceMember.count({
 			where: { workspaceId },

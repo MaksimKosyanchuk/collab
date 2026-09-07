@@ -4,7 +4,6 @@ import { SearchController } from './search.controller';
 import { SearchProcessor } from './search.processor';
 import { SearchService } from './search.service';
 import { RevalidateProcessor } from './revalidate.processor';
-
 @Module({
 	imports: [
 		BullModule.registerQueue({ name: 'search-sync' }),

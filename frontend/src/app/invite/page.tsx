@@ -3,17 +3,17 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ACCESS_COOKIE } from '@/lib/api';
-
 type Props = {
-	searchParams: Promise<{ t?: string; token?: string }>;
+	searchParams: Promise<{
+		t?: string;
+		token?: string;
+	}>;
 };
-
 export default async function InvitePage({ searchParams }: Props) {
 	const query = await searchParams;
 	const token = query.t ?? query.token;
 	const jar = await cookies();
 	const access = jar.get(ACCESS_COOKIE)?.value;
-
 	if (!token) {
 		return (
 			<main className="mx-auto flex min-h-screen max-w-lg items-center px-5 py-12">
@@ -27,12 +27,10 @@ export default async function InvitePage({ searchParams }: Props) {
 			</main>
 		);
 	}
-
 	if (!access) {
 		const next = `/invite?t=${encodeURIComponent(token)}`;
 		redirect(`/login?next=${encodeURIComponent(next)}`);
 	}
-
 	return (
 		<main className="mx-auto flex min-h-screen max-w-lg items-center px-5 py-12">
 			<AcceptInvitePanel token={token} />

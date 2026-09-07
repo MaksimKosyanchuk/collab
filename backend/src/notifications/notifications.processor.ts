@@ -3,13 +3,11 @@ import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-
 type MentionPayload = {
 	threadId: string;
 	authorId: string;
 	names: string[];
 };
-
 type InvitePayload = {
 	invitationId: string;
 	userId: string;
@@ -19,7 +17,6 @@ type InvitePayload = {
 	workspaceName: string;
 	invitedByName: string;
 };
-
 type DocumentSharePayload = {
 	invitationId: string;
 	userId: string;
@@ -31,15 +28,12 @@ type DocumentSharePayload = {
 	workspaceName: string;
 	invitedByName: string;
 };
-
 @Processor('notifications')
 export class NotificationsProcessor extends WorkerHost {
 	private readonly logger = new Logger(NotificationsProcessor.name);
-
 	constructor(private readonly prisma: PrismaService) {
 		super();
 	}
-
 	async process(job: Job): Promise<void> {
 		if (job.name === 'notification.mention') {
 			await this.handleMention(job as Job<MentionPayload>);
@@ -55,13 +49,11 @@ export class NotificationsProcessor extends WorkerHost {
 		}
 		this.logger.debug(`Skip notification job ${job.name}`);
 	}
-
 	private async handleDocumentShare(job: Job<DocumentSharePayload>): Promise<void> {
 		const data = job.data ?? ({} as DocumentSharePayload);
 		let userId = data.userId;
 		const invitationId = data.invitationId;
 		const email = data.email?.toLowerCase().trim();
-
 		if (!invitationId) {
 			this.logger.warn(`Doc share job ${job.id} missing invitationId`);
 			return;
@@ -77,7 +69,6 @@ export class NotificationsProcessor extends WorkerHost {
 			this.logger.warn(`Doc share job ${job.id} has no target user (${invitationId})`);
 			return;
 		}
-
 		const invitation = await this.prisma.documentShareInvitation.findUnique({
 			where: { id: invitationId },
 			include: {
@@ -95,7 +86,6 @@ export class NotificationsProcessor extends WorkerHost {
 		if (!invitation || invitation.status !== 'PENDING') {
 			return;
 		}
-
 		const eventId = `doc-share:${invitationId}`;
 		try {
 			await this.prisma.notification.create({
@@ -122,18 +112,15 @@ export class NotificationsProcessor extends WorkerHost {
 			throw error;
 		}
 	}
-
 	private async handleInvite(job: Job<InvitePayload>): Promise<void> {
 		const data = job.data ?? ({} as InvitePayload);
 		let userId = data.userId;
 		const invitationId = data.invitationId;
 		const email = data.email?.toLowerCase().trim();
-
 		if (!invitationId) {
 			this.logger.warn(`Invite job ${job.id} missing invitationId`);
 			return;
 		}
-
 		if (!userId && email) {
 			const user = await this.prisma.user.findUnique({
 				where: { email },
@@ -147,7 +134,6 @@ export class NotificationsProcessor extends WorkerHost {
 			);
 			return;
 		}
-
 		const invitation = await this.prisma.workspaceInvitation.findUnique({
 			where: { id: invitationId },
 			include: {
@@ -158,7 +144,6 @@ export class NotificationsProcessor extends WorkerHost {
 		if (!invitation || invitation.status !== 'PENDING') {
 			return;
 		}
-
 		const eventId = `invite:${invitationId}`;
 		try {
 			await this.prisma.notification.create({
@@ -183,13 +168,11 @@ export class NotificationsProcessor extends WorkerHost {
 			throw error;
 		}
 	}
-
 	private async handleMention(job: Job<MentionPayload>): Promise<void> {
 		const { threadId, authorId, names } = job.data;
 		if (!names?.length) {
 			return;
 		}
-
 		const thread = await this.prisma.commentThread.findUnique({
 			where: { id: threadId },
 			select: {
@@ -202,7 +185,6 @@ export class NotificationsProcessor extends WorkerHost {
 		if (!thread) {
 			return;
 		}
-
 		const uniqueNames = [...new Set(names.map((n) => n.toLowerCase()))];
 		const users = await this.prisma.user.findMany({
 			where: {
@@ -214,7 +196,6 @@ export class NotificationsProcessor extends WorkerHost {
 			},
 			select: { id: true },
 		});
-
 		for (const user of users) {
 			if (user.id === authorId) {
 				continue;

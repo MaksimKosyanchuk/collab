@@ -1,12 +1,10 @@
 'use client';
-
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSnapshotAction, listVersionsAction, restoreVersionAction } from '@/lib/actions';
 import { useToast } from '@/components/toast-provider';
 import { messageFromUnknown } from '@/lib/errors';
 import type { DocumentVersion } from '@/lib/types';
-
 function formatWhen(iso: string) {
 	try {
 		return new Date(iso).toLocaleString();
@@ -14,7 +12,6 @@ function formatWhen(iso: string) {
 		return iso;
 	}
 }
-
 export function VersionHistoryPanel({
 	documentId,
 	workspaceId,
@@ -29,7 +26,6 @@ export function VersionHistoryPanel({
 	const [versions, setVersions] = useState<DocumentVersion[]>([]);
 	const [pending, startTransition] = useTransition();
 	const [loading, setLoading] = useState(true);
-
 	const load = useCallback(() => {
 		setLoading(true);
 		startTransition(async () => {
@@ -47,13 +43,10 @@ export function VersionHistoryPanel({
 			}
 		});
 	}, [documentId, show]);
-
 	useEffect(() => {
 		if (canEdit) load();
 	}, [canEdit, load]);
-
 	if (!canEdit) return null;
-
 	function snapshot() {
 		startTransition(async () => {
 			const result = await createSnapshotAction(documentId, workspaceId);
@@ -65,7 +58,6 @@ export function VersionHistoryPanel({
 			load();
 		});
 	}
-
 	function restore(versionId: string) {
 		startTransition(async () => {
 			const result = await restoreVersionAction(documentId, workspaceId, versionId);
@@ -78,7 +70,6 @@ export function VersionHistoryPanel({
 			load();
 		});
 	}
-
 	return (
 		<div className="space-y-2 border-t border-line pt-3">
 			<div className="flex items-center justify-between gap-2">

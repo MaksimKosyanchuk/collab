@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import { apiBase } from '@/lib/api';
 import type { PublishedDocument } from '@/lib/types';
-
 type Props = {
-	params: Promise<{ slug: string }>;
+	params: Promise<{
+		slug: string;
+	}>;
 };
-
 async function loadPublished(slug: string): Promise<PublishedDocument | null> {
 	const res = await fetch(`${apiBase()}/public/documents/${slug}`, {
 		next: { revalidate: 30, tags: [`public-doc:${slug}`] },
@@ -15,7 +15,6 @@ async function loadPublished(slug: string): Promise<PublishedDocument | null> {
 	}
 	return res.json() as Promise<PublishedDocument>;
 }
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { slug } = await params;
 	const doc = await loadPublished(slug);
@@ -27,11 +26,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 		description: doc.description || undefined,
 	};
 }
-
 export default async function PublicDocumentPage({ params }: Props) {
 	const { slug } = await params;
 	const doc = await loadPublished(slug);
-
 	if (!doc) {
 		return (
 			<main className="mx-auto max-w-3xl px-5 py-16">
@@ -43,7 +40,6 @@ export default async function PublicDocumentPage({ params }: Props) {
 			</main>
 		);
 	}
-
 	return (
 		<main className="mx-auto max-w-3xl px-5 py-16">
 			<p className="brand text-2xl">Collab Docs</p>
@@ -93,7 +89,6 @@ export default async function PublicDocumentPage({ params }: Props) {
 							}
 							if (block.type === 'image' && block.src) {
 								return (
-									// eslint-disable-next-line @next/next/no-img-element
 									<img
 										key={block.id}
 										src={block.src}

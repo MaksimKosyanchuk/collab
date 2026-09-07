@@ -1,5 +1,4 @@
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import {
@@ -9,9 +8,7 @@ import {
 	updateWorkspaceMemberRoleAction,
 } from '@/lib/actions';
 import type { WorkspaceInvitation, WorkspaceMember, WorkspaceRole } from '@/lib/types';
-
 type InviteRole = Exclude<WorkspaceRole, 'OWNER'>;
-
 export function WorkspaceMembersPanel({
 	workspaceId,
 	members: initialMembers,
@@ -34,7 +31,6 @@ export function WorkspaceMembersPanel({
 	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
-
 	const sortedMembers = useMemo(
 		() =>
 			[...members].sort((a, b) => {
@@ -43,7 +39,6 @@ export function WorkspaceMembersPanel({
 			}),
 		[members],
 	);
-
 	function run(task: () => Promise<void>) {
 		setError(null);
 		setMessage(null);
@@ -55,7 +50,6 @@ export function WorkspaceMembersPanel({
 			}
 		});
 	}
-
 	return (
 		<section className="panel p-4">
 			<h2 className="text-sm font-semibold">Members</h2>

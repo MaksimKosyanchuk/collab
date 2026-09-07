@@ -1,11 +1,9 @@
 'use client';
-
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { createDocumentAction, moveDocumentAction } from '@/lib/actions';
 import type { DocumentTreeItem } from '@/lib/types';
-
 function buildForest(items: DocumentTreeItem[]) {
 	const byParent = new Map<string | null, DocumentTreeItem[]>();
 	for (const item of items) {
@@ -19,7 +17,6 @@ function buildForest(items: DocumentTreeItem[]) {
 	}
 	return byParent;
 }
-
 function TreeNodes({
 	workspaceId,
 	parentId,
@@ -38,12 +35,16 @@ function TreeNodes({
 	const nodes = byParent.get(parentId) ?? [];
 	const [pending, startTransition] = useTransition();
 	const [dragOverId, setDragOverId] = useState<string | null>(null);
-
 	if (nodes.length === 0 && depth === 0) {
 		return <p className="empty mt-3">No documents yet.</p>;
 	}
-
-	function runMove(documentId: string, input: { parentId: string | null; rank?: string }) {
+	function runMove(
+		documentId: string,
+		input: {
+			parentId: string | null;
+			rank?: string;
+		},
+	) {
 		startTransition(async () => {
 			const result = await moveDocumentAction(workspaceId, documentId, input);
 			if (result.ok) {
@@ -51,7 +52,6 @@ function TreeNodes({
 			}
 		});
 	}
-
 	return (
 		<ul
 			className={
@@ -85,9 +85,7 @@ function TreeNodes({
 								rank: lastChild ? `${lastChild.rank}z` : 'a0',
 							});
 						}}
-						className={`group flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-neutral-50 ${
-							dragOverId === node.id ? 'bg-neutral-100 ring-1 ring-line' : ''
-						}`}
+						className={`group flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-neutral-50 ${dragOverId === node.id ? 'bg-neutral-100 ring-1 ring-line' : ''}`}
 					>
 						<Link
 							href={`/app/w/${workspaceId}/d/${node.id}`}
@@ -178,7 +176,6 @@ function TreeNodes({
 		</ul>
 	);
 }
-
 export function DocumentTreeNav({
 	workspaceId,
 	documents,
@@ -190,7 +187,6 @@ export function DocumentTreeNav({
 }) {
 	const router = useRouter();
 	const byParent = buildForest(documents);
-
 	return (
 		<div>
 			{canEdit ? (

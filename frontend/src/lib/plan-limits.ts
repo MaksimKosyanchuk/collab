@@ -1,11 +1,9 @@
 export type PlanTier = 'FREE' | 'PRO' | 'TEAM';
-
 export type PlanLimits = {
 	members: number;
 	documents: number;
 	storageBytes: number;
 };
-
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
 	FREE: {
 		members: 3,
@@ -19,11 +17,10 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
 	},
 	TEAM: {
 		members: 50,
-		documents: 10_000,
+		documents: 10000,
 		storageBytes: 50 * 1024 * 1024 * 1024,
 	},
 };
-
 export function formatStorage(bytes: number): string {
 	if (bytes >= 1024 * 1024 * 1024) {
 		return `${Math.round(bytes / (1024 * 1024 * 1024))} GB`;

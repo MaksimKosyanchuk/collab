@@ -1,13 +1,10 @@
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { changeWorkspacePlanAction } from '@/lib/actions';
 import { PLAN_LIMITS, formatStorage, type PlanTier } from '@/lib/plan-limits';
 import type { WorkspaceRole, WorkspaceSubscription } from '@/lib/types';
-
 const PLANS: PlanTier[] = ['FREE', 'PRO', 'TEAM'];
-
 export function WorkspaceBillingPanel({
 	workspaceId,
 	plan: initialPlan,
@@ -29,7 +26,6 @@ export function WorkspaceBillingPanel({
 	const [pending, startTransition] = useTransition();
 	const limits = PLAN_LIMITS[plan];
 	const used = Number(storageUsedBytes || '0');
-
 	return (
 		<section className="panel rounded-[1.5rem] p-6">
 			<h2 className="text-lg font-semibold">Billing</h2>

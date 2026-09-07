@@ -1,6 +1,5 @@
 import { createHash } from 'crypto';
 import { CollabPersistenceService } from './collab-persistence.service';
-
 describe('CollabPersistenceService.applyUpdate', () => {
 	it('stores a new update and reports applied=true', async () => {
 		const payload = new Uint8Array([1, 2, 3, 4]);
@@ -12,7 +11,6 @@ describe('CollabPersistenceService.applyUpdate', () => {
 			},
 		};
 		const service = new CollabPersistenceService(prisma as never);
-
 		await expect(service.applyUpdate('doc-1', payload)).resolves.toEqual({
 			applied: true,
 		});
@@ -24,7 +22,6 @@ describe('CollabPersistenceService.applyUpdate', () => {
 			},
 		});
 	});
-
 	it('returns applied=false when the same hash already exists (replay)', async () => {
 		const payload = new Uint8Array([9, 9, 9]);
 		const prisma = {
@@ -34,7 +31,6 @@ describe('CollabPersistenceService.applyUpdate', () => {
 			},
 		};
 		const service = new CollabPersistenceService(prisma as never);
-
 		await expect(service.applyUpdate('doc-1', payload)).resolves.toEqual({
 			applied: false,
 		});

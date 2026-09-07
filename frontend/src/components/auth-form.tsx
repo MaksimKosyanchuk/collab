@@ -1,11 +1,12 @@
 'use client';
-
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { loginAction, registerAction } from '@/lib/actions';
-
-type AuthState = { error?: string } | undefined;
-
+type AuthState =
+	| {
+			error?: string;
+	  }
+	| undefined;
 export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: string | null }) {
 	const action = mode === 'login' ? loginAction : registerAction;
 	const [state, formAction, pending] = useActionState(
@@ -17,7 +18,6 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: st
 		: mode === 'login'
 			? '/register'
 			: '/login';
-
 	return (
 		<div className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center px-4 py-10">
 			<div className="panel p-5">

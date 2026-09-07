@@ -17,17 +17,16 @@ import {
 	MoveDocumentDto,
 	ShareDocumentDto,
 } from './dto/document.dto';
-
 @Injectable()
 export class DocumentsService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly access: AccessService,
 		private readonly collab: CollabPersistenceService,
-		@Inject(COLLAB_CONTROL) private readonly rooms: CollabControl,
+		@Inject(COLLAB_CONTROL)
+		private readonly rooms: CollabControl,
 		private readonly outbox: OutboxService,
 	) {}
-
 	async tree(workspaceId: string, userId: string) {
 		await this.access.assertWorkspaceMember(workspaceId, userId);
 		return this.prisma.document.findMany({
@@ -43,14 +42,12 @@ export class DocumentsService {
 			},
 		});
 	}
-
 	async create(workspaceId: string, userId: string, dto: CreateDocumentDto) {
 		await this.access.assertWorkspaceDocumentCreate(workspaceId, userId);
 		const workspace = await this.prisma.workspace.findUniqueOrThrow({
 			where: { id: workspaceId },
 		});
 		await this.assertDocumentLimit(workspaceId, workspace.plan);
-
 		if (dto.parentId) {
 			const parent = await this.prisma.document.findFirst({
 				where: { id: dto.parentId, workspaceId, deletedAt: null },
@@ -59,7 +56,6 @@ export class DocumentsService {
 				throw new BadRequestException('Parent document not found');
 			}
 		}
-
 		const last = await this.prisma.document.findFirst({
 			where: {
 				workspaceId,
@@ -108,7 +104,6 @@ export class DocumentsService {
 		});
 		return document;
 	}
-
 	async get(documentId: string, ctx: AccessContext) {
 		const { document, level } = await this.access.assertDocumentView(documentId, ctx);
 		const canManageDoc = canManage(level);
@@ -167,7 +162,6 @@ export class DocumentsService {
 			publicLinks,
 		};
 	}
-
 	async getShared(documentId: string, shareToken: string) {
 		if (!shareToken.trim()) {
 			throw new BadRequestException('Share token is required');
@@ -187,7 +181,6 @@ export class DocumentsService {
 			publicLinks: [],
 		};
 	}
-
 	async listSharedWithMe(userId: string) {
 		const shares = await this.prisma.documentShare.findMany({
 			where: {
@@ -208,7 +201,6 @@ export class DocumentsService {
 			},
 			orderBy: { updatedAt: 'desc' },
 		});
-
 		return shares.map((share) => ({
 			shareId: share.id,
 			access: share.access,
@@ -221,7 +213,6 @@ export class DocumentsService {
 			updatedAt: share.document.updatedAt,
 		}));
 	}
-
 	async rename(documentId: string, ctx: AccessContext, title: string) {
 		await this.access.assertDocumentEdit(documentId, ctx);
 		const document = await this.prisma.document.update({
@@ -242,7 +233,6 @@ export class DocumentsService {
 		});
 		return document;
 	}
-
 	async move(documentId: string, ctx: AccessContext, dto: MoveDocumentDto) {
 		const { document } = await this.access.assertDocumentEdit(documentId, ctx);
 		if (dto.parentId === documentId) {
@@ -289,14 +279,12 @@ export class DocumentsService {
 		});
 		return moved;
 	}
-
 	async remove(documentId: string, ctx: AccessContext) {
 		await this.access.assertDocumentEdit(documentId, ctx);
 		const document = await this.prisma.document.update({
 			where: { id: documentId },
 			data: { deletedAt: new Date() },
 		});
-		// Active editors must get document_deleted and have sockets closed.
 		await this.rooms.closeDeleted(documentId);
 		await this.outbox.enqueue({
 			type: 'search.delete',
@@ -318,13 +306,11 @@ export class DocumentsService {
 		});
 		return document;
 	}
-
 	async publish(documentId: string, ctx: AccessContext, published: boolean) {
 		const { document, level } = await this.access.assertDocumentEdit(documentId, ctx);
 		if (!canEdit(level)) {
 			throw new BadRequestException('Cannot publish this document');
 		}
-		// Edge case: publish must project live Y.Doc (incl. edits not yet flushed).
 		await this.rooms.flushProjection(documentId);
 		const fresh = await this.prisma.document.findUniqueOrThrow({
 			where: { id: documentId },
@@ -357,7 +343,6 @@ export class DocumentsService {
 		});
 		return updated;
 	}
-
 	async getPublished(slug: string) {
 		const document = await this.prisma.document.findFirst({
 			where: {
@@ -383,7 +368,6 @@ export class DocumentsService {
 			updatedAt: document.updatedAt,
 		};
 	}
-
 	async share(documentId: string, ctx: AccessContext, dto: ShareDocumentDto) {
 		const { document } = await this.access.assertDocumentManage(documentId, ctx);
 		if (dto.access === 'MANAGE') {
@@ -397,7 +381,6 @@ export class DocumentsService {
 		if (!existingUser) {
 			throw new NotFoundException('User not found');
 		}
-
 		const member = await this.prisma.workspaceMember.findUnique({
 			where: {
 				workspaceId_userId: {
@@ -411,7 +394,6 @@ export class DocumentsService {
 				'Owner/Admin already have full access; document permission cannot change it',
 			);
 		}
-
 		const existingShare = await this.prisma.documentShare.findUnique({
 			where: {
 				documentId_userId: { documentId, userId: existingUser.id },
@@ -420,7 +402,6 @@ export class DocumentsService {
 		if (existingShare && existingShare.access === dto.access) {
 			throw new BadRequestException('User already has this document permission');
 		}
-
 		const pending = await this.prisma.documentShareInvitation.findFirst({
 			where: { documentId, email, status: 'PENDING' },
 			orderBy: { createdAt: 'desc' },
@@ -434,7 +415,6 @@ export class DocumentsService {
 				data: { status: 'REVOKED' },
 			});
 		}
-
 		const inviter = ctx.userId
 			? await this.prisma.user.findUnique({
 					where: { id: ctx.userId },
@@ -445,7 +425,6 @@ export class DocumentsService {
 			where: { id: document.workspaceId },
 			select: { name: true },
 		});
-
 		const invitation = await this.prisma.documentShareInvitation.create({
 			data: {
 				documentId,
@@ -455,7 +434,6 @@ export class DocumentsService {
 				expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
 			},
 		});
-
 		await this.outbox.enqueue({
 			type: 'notification.document_share',
 			aggregateType: 'document',
@@ -473,7 +451,6 @@ export class DocumentsService {
 				invitedByName: inviter?.displayName ?? 'Someone',
 			},
 		});
-
 		return {
 			status: 'invited' as const,
 			id: invitation.id,
@@ -483,7 +460,6 @@ export class DocumentsService {
 			expiresAt: invitation.expiresAt,
 		};
 	}
-
 	async respondShareInvite(
 		userId: string,
 		userEmail: string,
@@ -516,7 +492,6 @@ export class DocumentsService {
 				'Sign in with the invited email to respond to this share',
 			);
 		}
-
 		if (action === 'decline') {
 			await this.prisma.documentShareInvitation.update({
 				where: { id: invitation.id },
@@ -528,7 +503,6 @@ export class DocumentsService {
 				workspaceId: invitation.document.workspaceId,
 			};
 		}
-
 		const share = await this.prisma.$transaction(async (tx) => {
 			await tx.documentShareInvitation.update({
 				where: { id: invitation.id },
@@ -554,7 +528,6 @@ export class DocumentsService {
 				},
 			});
 		});
-
 		await this.rooms.revalidateUserOnDocument(invitation.documentId, userId);
 		return {
 			status: 'accepted' as const,
@@ -564,7 +537,6 @@ export class DocumentsService {
 			access: share.access,
 		};
 	}
-
 	async unshare(documentId: string, ctx: AccessContext, shareUserId: string) {
 		await this.access.assertDocumentManage(documentId, ctx);
 		await this.prisma.documentShare.deleteMany({
@@ -573,7 +545,6 @@ export class DocumentsService {
 		await this.rooms.revalidateUserOnDocument(documentId, shareUserId);
 		return { removed: true };
 	}
-
 	async updateShareAccess(
 		documentId: string,
 		ctx: AccessContext,
@@ -604,7 +575,6 @@ export class DocumentsService {
 		await this.rooms.revalidateUserOnDocument(documentId, shareUserId);
 		return share;
 	}
-
 	async createPublicLink(
 		documentId: string,
 		ctx: AccessContext,
@@ -628,7 +598,6 @@ export class DocumentsService {
 		});
 		return { id: link.id, token, access: link.access, expiresAt: link.expiresAt };
 	}
-
 	async updatePublicLink(
 		documentId: string,
 		linkId: string,
@@ -659,7 +628,6 @@ export class DocumentsService {
 		await this.rooms.revalidateAllClientsOnDocument(documentId);
 		return link;
 	}
-
 	async revokePublicLink(documentId: string, linkId: string, ctx: AccessContext) {
 		await this.access.assertDocumentManage(documentId, ctx);
 		const existing = await this.prisma.documentPublicLink.findFirst({
@@ -675,7 +643,6 @@ export class DocumentsService {
 		await this.rooms.revalidateAllClientsOnDocument(documentId);
 		return { revoked: true, id: linkId };
 	}
-
 	async listVersions(documentId: string, ctx: AccessContext) {
 		await this.access.assertDocumentView(documentId, ctx);
 		return this.prisma.documentVersion.findMany({
@@ -690,7 +657,6 @@ export class DocumentsService {
 			},
 		});
 	}
-
 	async createSnapshot(documentId: string, ctx: AccessContext, userId: string) {
 		const { document } = await this.access.assertDocumentEdit(documentId, ctx);
 		const version = await this.collab.snapshot(documentId, document.title, 'MANUAL', userId);
@@ -701,7 +667,6 @@ export class DocumentsService {
 			createdAt: version.createdAt,
 		};
 	}
-
 	async restoreVersion(
 		documentId: string,
 		versionId: string,
@@ -720,7 +685,6 @@ export class DocumentsService {
 		await this.rooms.reload(documentId);
 		return { restored: versionId };
 	}
-
 	private async enqueueIndex(workspaceId: string, documentId: string) {
 		await this.outbox.enqueue({
 			type: 'search.index',
@@ -730,7 +694,6 @@ export class DocumentsService {
 			payload: { documentId, workspaceId },
 		});
 	}
-
 	private async assertDocumentLimit(workspaceId: string, plan: PlanTier) {
 		const count = await this.prisma.document.count({
 			where: { workspaceId, deletedAt: null },

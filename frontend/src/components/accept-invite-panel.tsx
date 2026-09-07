@@ -1,15 +1,12 @@
 'use client';
-
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { acceptWorkspaceInviteAction } from '@/lib/actions';
-
 export function AcceptInvitePanel({ token }: { token: string }) {
 	const router = useRouter();
 	const [error, setError] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
-
 	return (
 		<div className="panel mx-auto w-full max-w-md rounded-[1.5rem] p-8">
 			<p className="brand text-3xl">Collab Docs</p>

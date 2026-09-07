@@ -7,8 +7,6 @@ import { CollabGateway } from './collab.gateway';
 import { CollabHealthController } from './collab-health.controller';
 import { CollabPersistenceModule } from './collab-persistence.module';
 import { CollabRoomsService } from './collab-rooms.service';
-
-/** Live Yjs gateway + Redis control server (runs in the collab process). */
 @Module({
 	imports: [JwtModule.register({}), AccessModule, CollabPersistenceModule],
 	controllers: [CollabHealthController],

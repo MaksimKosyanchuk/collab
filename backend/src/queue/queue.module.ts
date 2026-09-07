@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { OutboxDispatcher } from './outbox.dispatcher';
 import { OutboxService } from './outbox.service';
-
 @Global()
 @Module({
 	imports: [

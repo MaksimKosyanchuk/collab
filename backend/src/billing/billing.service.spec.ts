@@ -1,11 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
 import { PlanTier, Prisma } from '@prisma/client';
 import { BillingService } from './billing.service';
-
 describe('BillingService.handleWebhook idempotency', () => {
 	const workspaceId = '11111111-1111-1111-1111-111111111111';
 	const externalId = 'evt_test_checkout_1';
-
 	function createService(prisma: Record<string, unknown>) {
 		const access = { assertWorkspaceManage: jest.fn() };
 		const logger = {
@@ -23,7 +21,6 @@ describe('BillingService.handleWebhook idempotency', () => {
 			queue as never,
 		);
 	}
-
 	it('applies plan once for a new checkout.session.completed event', async () => {
 		const tx = {
 			billingEvent: {
@@ -46,20 +43,17 @@ describe('BillingService.handleWebhook idempotency', () => {
 				updateMany: jest.fn().mockResolvedValue({ count: 0 }),
 			},
 		};
-
 		const prisma = {
 			billingEvent: {
 				findUnique: jest.fn().mockResolvedValue(null),
 			},
 			$transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
 		};
-
 		const service = createService(prisma);
 		const first = await service.handleWebhook(externalId, 'checkout.session.completed', {
 			workspaceId,
 			plan: PlanTier.PRO,
 		});
-
 		expect(first).toEqual({ duplicate: false, eventId: 'be-1' });
 		expect(tx.workspace.update).toHaveBeenCalledWith({
 			where: { id: workspaceId },
@@ -67,7 +61,6 @@ describe('BillingService.handleWebhook idempotency', () => {
 		});
 		expect(tx.billingEvent.create).toHaveBeenCalledTimes(1);
 	});
-
 	it('ignores replay of the same externalId without changing plan again', async () => {
 		const prisma = {
 			billingEvent: {
@@ -79,16 +72,13 @@ describe('BillingService.handleWebhook idempotency', () => {
 			$transaction: jest.fn(),
 		};
 		const service = createService(prisma);
-
 		const replay = await service.handleWebhook(externalId, 'checkout.session.completed', {
 			workspaceId,
 			plan: PlanTier.TEAM,
 		});
-
 		expect(replay).toEqual({ duplicate: true, eventId: 'be-existing' });
 		expect(prisma.$transaction).not.toHaveBeenCalled();
 	});
-
 	it('treats unique-constraint race as duplicate', async () => {
 		const prisma = {
 			billingEvent: {
@@ -102,15 +92,12 @@ describe('BillingService.handleWebhook idempotency', () => {
 			),
 		};
 		const service = createService(prisma);
-
 		const result = await service.handleWebhook(externalId, 'checkout.session.completed', {
 			workspaceId,
 			plan: PlanTier.PRO,
 		});
-
 		expect(result).toEqual({ duplicate: true, eventId: externalId });
 	});
-
 	it('propagates missing workspace errors', async () => {
 		const tx = {
 			billingEvent: {
@@ -127,7 +114,6 @@ describe('BillingService.handleWebhook idempotency', () => {
 			$transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
 		};
 		const service = createService(prisma);
-
 		await expect(
 			service.handleWebhook(externalId, 'checkout.session.completed', {
 				workspaceId,

@@ -2,7 +2,6 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { Observable } from 'rxjs';
-
 @Injectable()
 export class CorrelationInterceptor implements NestInterceptor {
 	intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {

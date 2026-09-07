@@ -1,5 +1,4 @@
 'use client';
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Y from 'yjs';
 import {
@@ -10,7 +9,6 @@ import {
 	type PresenceUser,
 	wsBase,
 } from '@/lib/blocks';
-
 function toBase64(bytes: Uint8Array): string {
 	let binary = '';
 	bytes.forEach((b) => {
@@ -18,7 +16,6 @@ function toBase64(bytes: Uint8Array): string {
 	});
 	return btoa(binary);
 }
-
 function fromBase64(value: string): Uint8Array {
 	const binary = atob(value);
 	const out = new Uint8Array(binary.length);
@@ -27,7 +24,6 @@ function fromBase64(value: string): Uint8Array {
 	}
 	return out;
 }
-
 function asBlocks(ydoc: Y.Doc): EditorBlock[] {
 	const raw = ydoc.getArray('blocks').toJSON() as unknown[];
 	return raw
@@ -48,7 +44,6 @@ function asBlocks(ydoc: Y.Doc): EditorBlock[] {
 			};
 		});
 }
-
 function findBlockMap(ydoc: Y.Doc, blockId: string): Y.Map<unknown> | null {
 	const blocks = ydoc.getArray('blocks');
 	for (let i = 0; i < blocks.length; i += 1) {
@@ -59,7 +54,6 @@ function findBlockMap(ydoc: Y.Doc, blockId: string): Y.Map<unknown> | null {
 	}
 	return null;
 }
-
 export function useCollabDoc(documentId: string, shareToken?: string | null) {
 	const ydocRef = useRef<Y.Doc | null>(null);
 	const socketRef = useRef<WebSocket | null>(null);
@@ -72,14 +66,12 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 	const [canEdit, setCanEdit] = useState(false);
 	const [conn, setConn] = useState<ConnState>('connecting');
 	const [browserOnline, setBrowserOnline] = useState(true);
-
 	const refreshLocal = useCallback(() => {
 		const ydoc = ydocRef.current;
 		if (!ydoc) return;
 		setTitle(String(ydoc.getMap('meta').get('title') ?? 'Untitled'));
 		setBlocks(asBlocks(ydoc));
 	}, []);
-
 	useEffect(() => {
 		const onOnline = () => setBrowserOnline(true);
 		const onOffline = () => setBrowserOnline(false);
@@ -91,14 +83,12 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 			window.removeEventListener('offline', onOffline);
 		};
 	}, []);
-
 	useEffect(() => {
 		let cancelled = false;
 		deletedRef.current = false;
 		setLocalUserId(null);
 		const ydoc = new Y.Doc();
 		ydocRef.current = ydoc;
-
 		const onDocUpdate = (update: Uint8Array, origin: unknown) => {
 			if (origin === 'remote' || applyingRemote.current) return;
 			const socket = socketRef.current;
@@ -112,7 +102,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 		};
 		ydoc.on('update', onDocUpdate);
 		ydoc.on('update', refreshLocal);
-
 		async function connect() {
 			if (cancelled || deletedRef.current) return;
 			setConn('connecting');
@@ -122,11 +111,13 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 					cache: 'no-store',
 				});
 				if (tokenRes.ok) {
-					const body = (await tokenRes.json()) as { accessToken: string };
+					const body = (await tokenRes.json()) as {
+						accessToken: string;
+					};
 					accessToken = body.accessToken;
 				}
 			} catch {
-				// Fall through — may still join with shareToken.
+				void 0;
 			}
 			if (!accessToken && !shareToken) {
 				if (!cancelled && !deletedRef.current) {
@@ -136,7 +127,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 				return;
 			}
 			if (cancelled || deletedRef.current) return;
-
 			const url = new URL(wsBase());
 			url.searchParams.set('documentId', documentId);
 			if (accessToken) {
@@ -147,7 +137,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 			}
 			const socket = new WebSocket(url.toString());
 			socketRef.current = socket;
-
 			socket.onopen = () => {
 				if (!cancelled && !deletedRef.current) setConn('online');
 			};
@@ -208,7 +197,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 				}
 			};
 		}
-
 		let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 		function scheduleReconnect() {
 			if (cancelled || deletedRef.current || reconnectTimer) return;
@@ -222,9 +210,7 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 				void connect();
 			}, 1500);
 		}
-
 		void connect();
-
 		const onOnline = () => {
 			if (cancelled || deletedRef.current) return;
 			if (socketRef.current?.readyState === WebSocket.OPEN) return;
@@ -235,7 +221,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 			void connect();
 		};
 		window.addEventListener('online', onOnline);
-
 		return () => {
 			cancelled = true;
 			window.removeEventListener('online', onOnline);
@@ -248,7 +233,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 			ydocRef.current = null;
 		};
 	}, [documentId, shareToken, refreshLocal]);
-
 	const updateTitle = useCallback(
 		(next: string) => {
 			if (!canEdit) return;
@@ -256,7 +240,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 		},
 		[canEdit],
 	);
-
 	const updateBlock = useCallback(
 		(blockId: string, patch: Partial<EditorBlock>) => {
 			if (!canEdit) return;
@@ -273,7 +256,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 		},
 		[canEdit],
 	);
-
 	const addBlock = useCallback(
 		(type: BlockType, afterId?: string) => {
 			if (!canEdit) return;
@@ -289,7 +271,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 			if (type === 'list') map.set('items', ['']);
 			if (type === 'code') map.set('language', 'ts');
 			if (type === 'image') map.set('src', '');
-
 			let index = blocksArr.length;
 			if (afterId) {
 				for (let i = 0; i < blocksArr.length; i += 1) {
@@ -304,7 +285,6 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 		},
 		[canEdit],
 	);
-
 	const removeBlock = useCallback(
 		(blockId: string) => {
 			if (!canEdit) return;
@@ -321,13 +301,11 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
 		},
 		[canEdit],
 	);
-
 	const setCursor = useCallback((blockId: string, offset: number) => {
 		const socket = socketRef.current;
 		if (!socket || socket.readyState !== WebSocket.OPEN) return;
 		socket.send(JSON.stringify({ type: 'cursor', blockId, offset }));
 	}, []);
-
 	return {
 		title,
 		blocks,

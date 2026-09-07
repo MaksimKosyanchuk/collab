@@ -1,12 +1,10 @@
 import { WorkspaceList } from '@/components/workspace-list';
 import { serverApi } from '@/lib/server-api';
 import type { SharedDocumentItem, Workspace } from '@/lib/types';
-
 export default async function AppHomePage() {
 	let workspaces: Workspace[] = [];
 	let sharedDocuments: SharedDocumentItem[] = [];
 	let error: string | null = null;
-
 	try {
 		const [ws, shared] = await Promise.all([
 			serverApi<Workspace[]>('/workspaces'),
@@ -17,7 +15,6 @@ export default async function AppHomePage() {
 	} catch (err) {
 		error = err instanceof Error ? err.message : 'Failed to load workspaces';
 	}
-
 	if (error) {
 		return (
 			<div className="panel rounded-2xl p-6">
@@ -25,6 +22,5 @@ export default async function AppHomePage() {
 			</div>
 		);
 	}
-
 	return <WorkspaceList workspaces={workspaces} sharedDocuments={sharedDocuments} />;
 }

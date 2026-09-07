@@ -1,13 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-
 const revalidatePath = vi.fn();
 const revalidateTag = vi.fn();
-
 vi.mock('next/cache', () => ({
 	revalidatePath: (...args: unknown[]) => revalidatePath(...args),
 	revalidateTag: (...args: unknown[]) => revalidateTag(...args),
 }));
-
 describe('POST /api/revalidate', () => {
 	beforeEach(() => {
 		vi.resetModules();
@@ -15,7 +12,6 @@ describe('POST /api/revalidate', () => {
 		revalidateTag.mockClear();
 		process.env.REVALIDATE_SECRET = 'test-secret';
 	});
-
 	it('rejects missing secret', async () => {
 		const { POST } = await import('@/app/api/revalidate/route');
 		const res = await POST(
@@ -26,7 +22,6 @@ describe('POST /api/revalidate', () => {
 		);
 		expect(res.status).toBe(401);
 	});
-
 	it('revalidates slug tag and path (on-demand ISR)', async () => {
 		const { POST } = await import('@/app/api/revalidate/route');
 		const res = await POST(
@@ -46,7 +41,9 @@ describe('POST /api/revalidate', () => {
 		expect(revalidatePath).toHaveBeenCalledWith('/p/hello');
 		expect(revalidateTag).toHaveBeenCalledWith('workspace-tree:ws');
 		expect(revalidatePath).toHaveBeenCalledWith('/app/w/ws');
-		const json = (await res.json()) as { revalidated: boolean };
+		const json = (await res.json()) as {
+			revalidated: boolean;
+		};
 		expect(json.revalidated).toBe(true);
 	});
 });

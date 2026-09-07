@@ -1,5 +1,4 @@
 'use server';
-
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath, revalidateTag } from 'next/cache';
@@ -18,19 +17,16 @@ import type {
 	Workspace,
 	WorkspaceRole,
 } from './types';
-
 function invalidateWorkspaceTree(workspaceId: string) {
 	revalidateTag(workspaceTreeTag(workspaceId));
 	revalidatePath(`/app/w/${workspaceId}`);
 }
-
 const cookieOpts = {
 	httpOnly: true,
 	sameSite: 'lax' as const,
 	path: '/',
 	secure: process.env.NODE_ENV === 'production',
 };
-
 async function setSession(tokens: AuthTokens) {
 	const jar = await cookies();
 	jar.set(ACCESS_COOKIE, tokens.accessToken, {
@@ -42,7 +38,6 @@ async function setSession(tokens: AuthTokens) {
 		maxAge: 60 * 60 * 24 * 7,
 	});
 }
-
 export async function registerAction(formData: FormData) {
 	const email = String(formData.get('email') ?? '');
 	const password = String(formData.get('password') ?? '');
@@ -61,7 +56,6 @@ export async function registerAction(formData: FormData) {
 	}
 	redirect(next ?? '/app');
 }
-
 export async function loginAction(formData: FormData) {
 	const email = String(formData.get('email') ?? '');
 	const password = String(formData.get('password') ?? '');
@@ -79,7 +73,6 @@ export async function loginAction(formData: FormData) {
 	}
 	redirect(next ?? '/app');
 }
-
 export async function logoutAction() {
 	const jar = await cookies();
 	const refresh = jar.get(REFRESH_COOKIE)?.value;
@@ -92,13 +85,12 @@ export async function logoutAction() {
 			});
 		}
 	} catch {
-		// clear cookies anyway
+		void 0;
 	}
 	jar.delete(ACCESS_COOKIE);
 	jar.delete(REFRESH_COOKIE);
 	redirect('/login');
 }
-
 export async function createWorkspaceAction(formData: FormData): Promise<void> {
 	const name = String(formData.get('name') ?? '').trim();
 	if (!name) {
@@ -110,7 +102,6 @@ export async function createWorkspaceAction(formData: FormData): Promise<void> {
 	});
 	redirect(`/app/w/${workspace.id}`);
 }
-
 export async function createDocumentAction(workspaceId: string, formData: FormData): Promise<void> {
 	const title = String(formData.get('title') ?? 'Untitled').trim() || 'Untitled';
 	const parentId = String(formData.get('parentId') ?? '') || undefined;
@@ -121,16 +112,21 @@ export async function createDocumentAction(workspaceId: string, formData: FormDa
 	invalidateWorkspaceTree(workspaceId);
 	redirect(`/app/w/${workspaceId}/d/${doc.id}`);
 }
-
-type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
-
+type ActionResult<T> =
+	| {
+			ok: true;
+			data: T;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
 function actionError(error: unknown, fallback: string): ActionResult<never> {
 	return {
 		ok: false,
 		error: error instanceof Error ? error.message : fallback,
 	};
 }
-
 export async function publishDocumentAction(
 	documentId: string,
 	workspaceId: string,
@@ -153,11 +149,13 @@ export async function publishDocumentAction(
 		return actionError(error, 'Publish failed');
 	}
 }
-
 export async function shareDocumentAction(
 	documentId: string,
 	workspaceId: string,
-	input: { email: string; access: DocumentAccess },
+	input: {
+		email: string;
+		access: DocumentAccess;
+	},
 ): Promise<
 	ActionResult<{
 		status: 'invited';
@@ -186,11 +184,13 @@ export async function shareDocumentAction(
 		return actionError(error, 'Share invite failed');
 	}
 }
-
 export async function createPublicLinkAction(
 	documentId: string,
 	workspaceId: string,
-	input: { access: DocumentAccess; expiresAt?: string },
+	input: {
+		access: DocumentAccess;
+		expiresAt?: string;
+	},
 ): Promise<
 	ActionResult<{
 		id: string;
@@ -215,10 +215,12 @@ export async function createPublicLinkAction(
 		return actionError(error, 'Public link failed');
 	}
 }
-
 export async function inviteWorkspaceMemberAction(
 	workspaceId: string,
-	input: { email: string; role: Exclude<WorkspaceRole, 'OWNER'> },
+	input: {
+		email: string;
+		role: Exclude<WorkspaceRole, 'OWNER'>;
+	},
 ): Promise<
 	ActionResult<{
 		status: 'invited';
@@ -246,7 +248,6 @@ export async function inviteWorkspaceMemberAction(
 		return actionError(error, 'Invite failed');
 	}
 }
-
 export async function renameWorkspaceAction(
 	workspaceId: string,
 	formData: FormData,
@@ -267,31 +268,38 @@ export async function renameWorkspaceAction(
 		return actionError(error, 'Rename failed');
 	}
 }
-
 export async function updateWorkspaceMemberRoleAction(
 	workspaceId: string,
 	memberUserId: string,
 	role: Exclude<WorkspaceRole, 'OWNER'>,
-): Promise<ActionResult<{ id: string; role: WorkspaceRole }>> {
+): Promise<
+	ActionResult<{
+		id: string;
+		role: WorkspaceRole;
+	}>
+> {
 	try {
-		const data = await serverApi<{ id: string; role: WorkspaceRole }>(
-			`/workspaces/${workspaceId}/members/${memberUserId}`,
-			{
-				method: 'PATCH',
-				body: JSON.stringify({ role }),
-			},
-		);
+		const data = await serverApi<{
+			id: string;
+			role: WorkspaceRole;
+		}>(`/workspaces/${workspaceId}/members/${memberUserId}`, {
+			method: 'PATCH',
+			body: JSON.stringify({ role }),
+		});
 		revalidatePath(`/app/w/${workspaceId}`);
 		return { ok: true, data };
 	} catch (error) {
 		return actionError(error, 'Role update failed');
 	}
 }
-
 export async function removeWorkspaceMemberAction(
 	workspaceId: string,
 	memberUserId: string,
-): Promise<ActionResult<{ removed: true }>> {
+): Promise<
+	ActionResult<{
+		removed: true;
+	}>
+> {
 	try {
 		await serverApi(`/workspaces/${workspaceId}/members/${memberUserId}`, {
 			method: 'DELETE',
@@ -302,10 +310,13 @@ export async function removeWorkspaceMemberAction(
 		return actionError(error, 'Remove failed');
 	}
 }
-
-export async function acceptWorkspaceInviteAction(
-	token: string,
-): Promise<ActionResult<{ workspaceId: string; workspaceName: string; role: string }>> {
+export async function acceptWorkspaceInviteAction(token: string): Promise<
+	ActionResult<{
+		workspaceId: string;
+		workspaceName: string;
+		role: string;
+	}>
+> {
 	try {
 		const data = await serverApi<{
 			workspaceId: string;
@@ -322,7 +333,6 @@ export async function acceptWorkspaceInviteAction(
 		return actionError(error, 'Accept invite failed');
 	}
 }
-
 export async function respondWorkspaceInviteAction(
 	invitationId: string,
 	action: 'accept' | 'decline',
@@ -356,7 +366,6 @@ export async function respondWorkspaceInviteAction(
 		);
 	}
 }
-
 export async function changeWorkspacePlanAction(
 	workspaceId: string,
 	plan: 'FREE' | 'PRO' | 'TEAM',
@@ -376,7 +385,6 @@ export async function changeWorkspacePlanAction(
 			revalidatePath('/app');
 			return { ok: true, data: { plan: 'FREE' } };
 		}
-
 		const session = await serverApi<{
 			id: string;
 			workspaceId: string;
@@ -386,7 +394,6 @@ export async function changeWorkspacePlanAction(
 			method: 'POST',
 			body: JSON.stringify({ workspaceId, plan }),
 		});
-
 		const webhook = await serverApi<{
 			duplicate: boolean;
 			eventId: string;
@@ -402,7 +409,6 @@ export async function changeWorkspacePlanAction(
 				},
 			}),
 		});
-
 		revalidatePath(`/app/w/${workspaceId}`);
 		revalidatePath('/app');
 		return {
@@ -413,10 +419,11 @@ export async function changeWorkspacePlanAction(
 		return actionError(error, 'Plan change failed');
 	}
 }
-
-export async function leaveWorkspaceAction(
-	workspaceId: string,
-): Promise<ActionResult<{ left: true }>> {
+export async function leaveWorkspaceAction(workspaceId: string): Promise<
+	ActionResult<{
+		left: true;
+	}>
+> {
 	try {
 		await serverApi(`/workspaces/${workspaceId}/leave`, { method: 'POST' });
 		revalidatePath('/app');
@@ -426,14 +433,22 @@ export async function leaveWorkspaceAction(
 		return actionError(error, 'Leave failed');
 	}
 }
-
 export async function moveDocumentAction(
 	workspaceId: string,
 	documentId: string,
-	input: { parentId?: string | null; rank?: string },
-): Promise<ActionResult<{ id: string }>> {
+	input: {
+		parentId?: string | null;
+		rank?: string;
+	},
+): Promise<
+	ActionResult<{
+		id: string;
+	}>
+> {
 	try {
-		const data = await serverApi<{ id: string }>(`/documents/${documentId}/move`, {
+		const data = await serverApi<{
+			id: string;
+		}>(`/documents/${documentId}/move`, {
 			method: 'POST',
 			body: JSON.stringify(input),
 		});
@@ -443,12 +458,15 @@ export async function moveDocumentAction(
 		return actionError(error, 'Move failed');
 	}
 }
-
 export async function unshareDocumentAction(
 	workspaceId: string,
 	documentId: string,
 	shareUserId: string,
-): Promise<ActionResult<{ removed: true }>> {
+): Promise<
+	ActionResult<{
+		removed: true;
+	}>
+> {
 	try {
 		await serverApi(`/documents/${documentId}/shares/${shareUserId}`, {
 			method: 'DELETE',
@@ -459,11 +477,13 @@ export async function unshareDocumentAction(
 		return actionError(error, 'Unshare failed');
 	}
 }
-
 export async function updateDocumentShareAccessAction(
 	workspaceId: string,
 	documentId: string,
-	input: { userId: string; access: DocumentAccess },
+	input: {
+		userId: string;
+		access: DocumentAccess;
+	},
 ): Promise<ActionResult<DocumentShare>> {
 	try {
 		const data = await serverApi<DocumentShare>(
@@ -479,7 +499,6 @@ export async function updateDocumentShareAccessAction(
 		return actionError(error, 'Update share failed');
 	}
 }
-
 export async function respondDocumentShareInviteAction(
 	invitationId: string,
 	action: 'accept' | 'decline',
@@ -515,7 +534,6 @@ export async function respondDocumentShareInviteAction(
 		);
 	}
 }
-
 export async function updatePublicLinkAccessAction(
 	workspaceId: string,
 	documentId: string,
@@ -547,12 +565,15 @@ export async function updatePublicLinkAccessAction(
 		return actionError(error, 'Update link failed');
 	}
 }
-
 export async function revokePublicLinkAction(
 	workspaceId: string,
 	documentId: string,
 	linkId: string,
-): Promise<ActionResult<{ revoked: true }>> {
+): Promise<
+	ActionResult<{
+		revoked: true;
+	}>
+> {
 	try {
 		await serverApi(`/documents/${documentId}/public-links/${linkId}`, {
 			method: 'DELETE',
@@ -563,10 +584,12 @@ export async function revokePublicLinkAction(
 		return actionError(error, 'Revoke link failed');
 	}
 }
-
 export async function createCommentThreadAction(
 	documentId: string,
-	input: { blockId: string; body: string },
+	input: {
+		blockId: string;
+		body: string;
+	},
 ): Promise<ActionResult<unknown>> {
 	try {
 		const data = await serverApi(`/documents/${documentId}/comments`, {
@@ -578,7 +601,6 @@ export async function createCommentThreadAction(
 		return actionError(error, 'Comment failed');
 	}
 }
-
 export async function addCommentAction(
 	threadId: string,
 	body: string,
@@ -593,7 +615,6 @@ export async function addCommentAction(
 		return actionError(error, 'Reply failed');
 	}
 }
-
 export async function resolveCommentThreadAction(threadId: string): Promise<ActionResult<unknown>> {
 	try {
 		const data = await serverApi(`/comment-threads/${threadId}/resolve`, {
@@ -604,10 +625,11 @@ export async function resolveCommentThreadAction(threadId: string): Promise<Acti
 		return actionError(error, 'Resolve failed');
 	}
 }
-
-export async function markNotificationReadAction(
-	notificationId: string,
-): Promise<ActionResult<{ ok: true }>> {
+export async function markNotificationReadAction(notificationId: string): Promise<
+	ActionResult<{
+		ok: true;
+	}>
+> {
 	try {
 		await serverApi(`/notifications/${notificationId}/read`, {
 			method: 'PATCH',
@@ -617,7 +639,6 @@ export async function markNotificationReadAction(
 		return actionError(error, 'Mark read failed');
 	}
 }
-
 export async function listVersionsAction(
 	documentId: string,
 ): Promise<ActionResult<DocumentVersion[]>> {
@@ -628,7 +649,6 @@ export async function listVersionsAction(
 		return actionError(error, 'Failed to load versions');
 	}
 }
-
 export async function createSnapshotAction(
 	documentId: string,
 	workspaceId: string,
@@ -643,27 +663,32 @@ export async function createSnapshotAction(
 		return actionError(error, 'Snapshot failed');
 	}
 }
-
 export async function restoreVersionAction(
 	documentId: string,
 	workspaceId: string,
 	versionId: string,
-): Promise<ActionResult<{ restored: string }>> {
+): Promise<
+	ActionResult<{
+		restored: string;
+	}>
+> {
 	try {
-		const data = await serverApi<{ restored: string }>(
-			`/documents/${documentId}/versions/${versionId}/restore`,
-			{ method: 'POST' },
-		);
+		const data = await serverApi<{
+			restored: string;
+		}>(`/documents/${documentId}/versions/${versionId}/restore`, { method: 'POST' });
 		revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
 		return { ok: true, data };
 	} catch (error) {
 		return actionError(error, 'Restore failed');
 	}
 }
-
 export async function presignAssetAction(
 	workspaceId: string,
-	input: { mimeType: string; sizeBytes: number; documentId?: string },
+	input: {
+		mimeType: string;
+		sizeBytes: number;
+		documentId?: string;
+	},
 ): Promise<ActionResult<AssetPresign>> {
 	try {
 		const data = await serverApi<AssetPresign>(`/workspaces/${workspaceId}/assets/presign`, {
@@ -675,7 +700,6 @@ export async function presignAssetAction(
 		return actionError(error, 'Upload prepare failed');
 	}
 }
-
 export async function confirmAssetAction(
 	workspaceId: string,
 	input: {

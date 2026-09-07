@@ -1,5 +1,4 @@
 import { AccessLevel, canCreateWorkspaceDocuments, resolveDocumentAccess } from './access.policy';
-
 describe('resolveDocumentAccess', () => {
 	it('maps workspace roles when no document permission', () => {
 		expect(resolveDocumentAccess({ workspaceRole: 'OWNER' })).toBe(AccessLevel.MANAGE);
@@ -7,7 +6,6 @@ describe('resolveDocumentAccess', () => {
 		expect(resolveDocumentAccess({ workspaceRole: 'EDITOR' })).toBe(AccessLevel.EDIT);
 		expect(resolveDocumentAccess({ workspaceRole: 'VIEWER' })).toBe(AccessLevel.VIEW);
 	});
-
 	it('lets document permission raise Viewer to Edit', () => {
 		expect(
 			resolveDocumentAccess({
@@ -16,7 +14,6 @@ describe('resolveDocumentAccess', () => {
 			}),
 		).toBe(AccessLevel.EDIT);
 	});
-
 	it('lets document permission restrict Editor to View', () => {
 		expect(
 			resolveDocumentAccess({
@@ -25,7 +22,6 @@ describe('resolveDocumentAccess', () => {
 			}),
 		).toBe(AccessLevel.VIEW);
 	});
-
 	it('never lets document permission restrict Owner/Admin', () => {
 		expect(
 			resolveDocumentAccess({
@@ -40,17 +36,14 @@ describe('resolveDocumentAccess', () => {
 			}),
 		).toBe(AccessLevel.MANAGE);
 	});
-
 	it('grants outsiders access via document share without workspace role', () => {
 		expect(resolveDocumentAccess({ shareAccess: 'EDIT' })).toBe(AccessLevel.EDIT);
 	});
-
 	it('grants outsiders access via public link when no membership/share', () => {
 		expect(resolveDocumentAccess({})).toBe(AccessLevel.NONE);
 		expect(resolveDocumentAccess({ publicLinkAccess: 'VIEW' })).toBe(AccessLevel.VIEW);
 		expect(resolveDocumentAccess({ publicLinkAccess: 'EDIT' })).toBe(AccessLevel.EDIT);
 	});
-
 	it('prefers workspace role over public link when both present', () => {
 		expect(
 			resolveDocumentAccess({
@@ -59,7 +52,6 @@ describe('resolveDocumentAccess', () => {
 			}),
 		).toBe(AccessLevel.VIEW);
 	});
-
 	it('prefers document share over public link', () => {
 		expect(
 			resolveDocumentAccess({
@@ -69,7 +61,6 @@ describe('resolveDocumentAccess', () => {
 		).toBe(AccessLevel.VIEW);
 	});
 });
-
 describe('canCreateWorkspaceDocuments', () => {
 	it('allows owners admins editors only', () => {
 		expect(canCreateWorkspaceDocuments('OWNER')).toBe(true);

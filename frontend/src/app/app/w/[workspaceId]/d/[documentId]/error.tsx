@@ -1,18 +1,19 @@
 'use client';
-
 import { useParams } from 'next/navigation';
 import { RouteError } from '@/components/route-state';
-
 export default function DocumentError({
 	error,
 	reset,
 }: {
-	error: Error & { digest?: string };
+	error: Error & {
+		digest?: string;
+	};
 	reset: () => void;
 }) {
-	const params = useParams<{ workspaceId?: string }>();
+	const params = useParams<{
+		workspaceId?: string;
+	}>();
 	const workspaceId = params.workspaceId;
-
 	return (
 		<RouteError
 			title="Document unavailable"

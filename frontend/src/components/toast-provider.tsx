@@ -1,21 +1,15 @@
 'use client';
-
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-
 type ToastKind = 'error' | 'success';
-
 type ToastItem = {
 	id: number;
 	message: string;
 	kind: ToastKind;
 };
-
 type ToastContextValue = {
 	show: (message: string, kind?: ToastKind) => void;
 };
-
 const ToastContext = createContext<ToastContextValue | null>(null);
-
 export function useToast() {
 	const ctx = useContext(ToastContext);
 	if (!ctx) {
@@ -23,22 +17,17 @@ export function useToast() {
 	}
 	return ctx;
 }
-
 export function ToastProvider({ children }: { children: React.ReactNode }) {
 	const [toast, setToast] = useState<ToastItem | null>(null);
-
 	const show = useCallback((message: string, kind: ToastKind = 'error') => {
 		setToast({ id: Date.now(), message, kind });
 	}, []);
-
 	useEffect(() => {
 		if (!toast) return;
 		const timer = window.setTimeout(() => setToast(null), 3000);
 		return () => window.clearTimeout(timer);
 	}, [toast]);
-
 	const value = useMemo(() => ({ show }), [show]);
-
 	return (
 		<ToastContext.Provider value={value}>
 			{children}
