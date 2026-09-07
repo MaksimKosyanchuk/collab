@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as Y from 'yjs';
+import { AccessService } from '../access/access.service';
+import { canEdit, canView } from '../access/access.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { OutboxService } from '../queue/outbox.service';
 import { CollabPersistenceService } from './collab-persistence.service';
@@ -18,15 +20,18 @@ type SocketLike = {
 export type RoomClient = {
   socket: SocketLike;
   documentId: string;
+  workspaceId: string;
   userId: string;
   displayName: string;
   canEdit: boolean;
   color: string;
+  shareToken?: string | null;
   cursor?: { blockId: string; offset: number } | null;
 };
 
 type Room = {
   documentId: string;
+  workspaceId: string;
   ydoc: Y.Doc;
   clients: Set<RoomClient>;
   persistTimer?: NodeJS.Timeout;
@@ -53,6 +58,7 @@ export class CollabRoomsService {
     private readonly persistence: CollabPersistenceService,
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
+    private readonly access: AccessService,
   ) {}
 
   async getRoom(documentId: string): Promise<Room> {
@@ -60,9 +66,17 @@ export class CollabRoomsService {
     if (existing && !existing.closed) {
       return existing;
     }
+    const document = await this.prisma.document.findFirst({
+      where: { id: documentId, deletedAt: null },
+      select: { id: true, workspaceId: true },
+    });
+    if (!document) {
+      throw new Error('Document not found');
+    }
     const ydoc = await this.persistence.loadDoc(documentId);
     const room: Room = {
       documentId,
+      workspaceId: document.workspaceId,
       ydoc,
       clients: new Set(),
       applying: false,
@@ -224,6 +238,127 @@ export class CollabRoomsService {
 
   nextColor(room: Room): string {
     return COLORS[room.clients.size % COLORS.length];
+  }
+
+  kickClient(
+    room: Room,
+    client: RoomClient,
+    reason = 'access_revoked',
+  ): void {
+    room.clients.delete(client);
+    const payload = JSON.stringify({
+      type: 'access_revoked',
+      reason,
+      documentId: room.documentId,
+    });
+    if (client.socket.readyState === 1) {
+      try {
+        client.socket.send(payload);
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      client.socket.close(4403, reason);
+    } catch {
+      // ignore
+    }
+    if (!room.closed) {
+      this.broadcastPresence(room);
+      if (room.clients.size === 0) {
+        this.schedulePersist(room, 0);
+      }
+    }
+  }
+
+  /**
+   * Drop live collab sessions for a user across a workspace (member removed).
+   */
+  kickUserFromWorkspace(workspaceId: string, userId: string): void {
+    for (const room of this.rooms.values()) {
+      if (room.closed || room.workspaceId !== workspaceId) {
+        continue;
+      }
+      for (const client of [...room.clients]) {
+        if (client.userId === userId) {
+          this.kickClient(room, client, 'workspace_membership_revoked');
+        }
+      }
+    }
+  }
+
+  /**
+   * Re-check ACL for one user on every open room in a workspace (role change).
+   */
+  async revalidateUserInWorkspace(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
+    for (const room of this.rooms.values()) {
+      if (room.closed || room.workspaceId !== workspaceId) {
+        continue;
+      }
+      for (const client of [...room.clients]) {
+        if (client.userId === userId) {
+          await this.revalidateClient(room, client);
+        }
+      }
+    }
+  }
+
+  async revalidateUserOnDocument(
+    documentId: string,
+    userId: string,
+  ): Promise<void> {
+    const room = this.peek(documentId);
+    if (!room) {
+      return;
+    }
+    for (const client of [...room.clients]) {
+      if (client.userId === userId) {
+        await this.revalidateClient(room, client);
+      }
+    }
+  }
+
+  async revalidateAllClientsOnDocument(documentId: string): Promise<void> {
+    const room = this.peek(documentId);
+    if (!room) {
+      return;
+    }
+    for (const client of [...room.clients]) {
+      await this.revalidateClient(room, client);
+    }
+  }
+
+  async revalidateClient(
+    room: Room,
+    client: RoomClient,
+  ): Promise<'ok' | 'kicked'> {
+    const userId = client.userId.startsWith('guest:') ? null : client.userId;
+    try {
+      const { level } = await this.access.resolveDocument(client.documentId, {
+        userId,
+        shareToken: client.shareToken,
+      });
+      if (!canView(level)) {
+        this.kickClient(room, client, 'access_revoked');
+        return 'kicked';
+      }
+      const edit = canEdit(level);
+      if (client.canEdit !== edit) {
+        client.canEdit = edit;
+        if (client.socket.readyState === 1) {
+          client.socket.send(
+            JSON.stringify({ type: 'access', canEdit: edit }),
+          );
+        }
+      }
+      return 'ok';
+    } catch {
+      this.kickClient(room, client, 'access_revoked');
+      return 'kicked';
+    }
   }
 
   private attachUpdateHandler(room: Room): void {

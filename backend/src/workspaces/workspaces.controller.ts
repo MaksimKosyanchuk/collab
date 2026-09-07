@@ -81,4 +81,12 @@ export class WorkspacesController {
   ) {
     return this.workspaces.removeMember(workspaceId, user.id, memberUserId);
   }
+
+  @Post(':workspaceId/leave')
+  leave(
+    @CurrentUser() user: AuthUser,
+    @Param('workspaceId') workspaceId: string,
+  ) {
+    return this.workspaces.leave(workspaceId, user.id);
+  }
 }

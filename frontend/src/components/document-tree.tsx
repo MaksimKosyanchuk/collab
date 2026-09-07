@@ -1,74 +1,24 @@
 import Link from 'next/link';
 import { createDocumentAction } from '@/lib/actions';
+import { DocumentTreeNav } from '@/components/document-tree-nav';
+import { WorkspaceBillingPanel } from '@/components/workspace-billing-panel';
 import { WorkspaceMembersPanel } from '@/components/workspace-members-panel';
 import type { DocumentTreeItem, WorkspaceDetail } from '@/lib/types';
-
-function buildForest(items: DocumentTreeItem[]) {
-  const byParent = new Map<string | null, DocumentTreeItem[]>();
-  for (const item of items) {
-    const key = item.parentId;
-    const list = byParent.get(key) ?? [];
-    list.push(item);
-    byParent.set(key, list);
-  }
-  for (const list of byParent.values()) {
-    list.sort((a, b) => a.rank.localeCompare(b.rank));
-  }
-  return byParent;
-}
-
-function TreeNodes({
-  workspaceId,
-  parentId,
-  byParent,
-  depth,
-}: {
-  workspaceId: string;
-  parentId: string | null;
-  byParent: Map<string | null, DocumentTreeItem[]>;
-  depth: number;
-}) {
-  const nodes = byParent.get(parentId) ?? [];
-  if (nodes.length === 0 && depth === 0) {
-    return <p className="empty">No documents yet.</p>;
-  }
-
-  return (
-    <ul className={depth === 0 ? 'space-y-1' : 'ml-4 space-y-1 border-l border-line pl-3'}>
-      {nodes.map((node) => (
-        <li key={node.id}>
-          <Link
-            href={`/app/w/${workspaceId}/d/${node.id}`}
-            className="flex items-center justify-between rounded-xl px-3 py-2 hover:bg-white/70"
-          >
-            <span className="font-medium">{node.title}</span>
-            {node.publicationStatus === 'PUBLISHED' ? (
-              <span className="text-xs uppercase tracking-wide text-accent">
-                live
-              </span>
-            ) : null}
-          </Link>
-          <TreeNodes
-            workspaceId={workspaceId}
-            parentId={node.id}
-            byParent={byParent}
-            depth={depth + 1}
-          />
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 export function DocumentTree({
   workspace,
   documents,
+  currentUserId,
 }: {
   workspace: WorkspaceDetail;
   documents: DocumentTreeItem[];
+  currentUserId: string;
 }) {
-  const byParent = buildForest(documents);
   const create = createDocumentAction.bind(null, workspace.id);
+  const canEditTree =
+    workspace.myRole === 'OWNER' ||
+    workspace.myRole === 'ADMIN' ||
+    workspace.myRole === 'EDITOR';
 
   return (
     <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
@@ -88,14 +38,11 @@ export function DocumentTree({
             </Link>
           </div>
 
-          <div className="mt-6">
-            <TreeNodes
-              workspaceId={workspace.id}
-              parentId={null}
-              byParent={byParent}
-              depth={0}
-            />
-          </div>
+          <DocumentTreeNav
+            workspaceId={workspace.id}
+            documents={documents}
+            canEdit={canEditTree}
+          />
 
           <form action={create} className="mt-6 space-y-3 border-t border-line pt-5">
             <p className="text-sm font-medium">New page</p>
@@ -115,6 +62,15 @@ export function DocumentTree({
           workspaceId={workspace.id}
           members={workspace.members}
           invitations={workspace.invitations ?? []}
+          myRole={workspace.myRole}
+          currentUserId={currentUserId}
+        />
+
+        <WorkspaceBillingPanel
+          workspaceId={workspace.id}
+          plan={workspace.plan}
+          storageUsedBytes={workspace.storageUsedBytes}
+          subscription={workspace.subscription}
           myRole={workspace.myRole}
         />
       </div>

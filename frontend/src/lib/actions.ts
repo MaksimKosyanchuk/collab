@@ -293,3 +293,233 @@ export async function acceptWorkspaceInviteAction(
     return actionError(error, 'Accept invite failed');
   }
 }
+
+export async function changeWorkspacePlanAction(
+  workspaceId: string,
+  plan: 'FREE' | 'PRO' | 'TEAM',
+): Promise<
+  ActionResult<{
+    plan: 'FREE' | 'PRO' | 'TEAM';
+    duplicateWebhook?: boolean;
+  }>
+> {
+  try {
+    if (plan === 'FREE') {
+      await serverApi('/billing/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ workspaceId, plan }),
+      });
+      revalidatePath(`/app/w/${workspaceId}`);
+      revalidatePath('/app');
+      return { ok: true, data: { plan: 'FREE' } };
+    }
+
+    const session = await serverApi<{
+      id: string;
+      workspaceId: string;
+      plan: 'FREE' | 'PRO' | 'TEAM';
+      status: string;
+    }>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ workspaceId, plan }),
+    });
+
+    const webhook = await serverApi<{
+      duplicate: boolean;
+      eventId: string;
+    }>('/billing/webhook', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: `mock_${session.id}_${Date.now()}`,
+        type: 'checkout.session.completed',
+        data: {
+          workspaceId,
+          plan,
+          checkoutSessionId: session.id,
+        },
+      }),
+    });
+
+    revalidatePath(`/app/w/${workspaceId}`);
+    revalidatePath('/app');
+    return {
+      ok: true,
+      data: { plan, duplicateWebhook: webhook.duplicate },
+    };
+  } catch (error) {
+    return actionError(error, 'Plan change failed');
+  }
+}
+
+export async function leaveWorkspaceAction(
+  workspaceId: string,
+): Promise<ActionResult<{ left: true }>> {
+  try {
+    await serverApi(`/workspaces/${workspaceId}/leave`, { method: 'POST' });
+    revalidatePath('/app');
+    revalidatePath(`/app/w/${workspaceId}`);
+    return { ok: true, data: { left: true } };
+  } catch (error) {
+    return actionError(error, 'Leave failed');
+  }
+}
+
+export async function moveDocumentAction(
+  workspaceId: string,
+  documentId: string,
+  input: { parentId?: string | null; rank?: string },
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const data = await serverApi<{ id: string }>(
+      `/documents/${documentId}/move`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+    revalidatePath(`/app/w/${workspaceId}`);
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Move failed');
+  }
+}
+
+export async function unshareDocumentAction(
+  workspaceId: string,
+  documentId: string,
+  shareUserId: string,
+): Promise<ActionResult<{ removed: true }>> {
+  try {
+    await serverApi(`/documents/${documentId}/shares/${shareUserId}`, {
+      method: 'DELETE',
+    });
+    revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
+    return { ok: true, data: { removed: true } };
+  } catch (error) {
+    return actionError(error, 'Unshare failed');
+  }
+}
+
+export async function updateDocumentShareAccessAction(
+  workspaceId: string,
+  documentId: string,
+  input: { userId: string; access: DocumentAccess },
+): Promise<ActionResult<DocumentShare>> {
+  try {
+    const data = await serverApi<DocumentShare>(
+      `/documents/${documentId}/shares`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    );
+    revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Update share failed');
+  }
+}
+
+export async function updatePublicLinkAccessAction(
+  workspaceId: string,
+  documentId: string,
+  linkId: string,
+  access: DocumentAccess,
+): Promise<
+  ActionResult<{
+    id: string;
+    tokenPrefix: string;
+    access: DocumentAccess;
+    expiresAt: string | null;
+    createdAt: string;
+  }>
+> {
+  try {
+    const data = await serverApi<{
+      id: string;
+      tokenPrefix: string;
+      access: DocumentAccess;
+      expiresAt: string | null;
+      createdAt: string;
+    }>(`/documents/${documentId}/public-links/${linkId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ access }),
+    });
+    revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Update link failed');
+  }
+}
+
+export async function revokePublicLinkAction(
+  workspaceId: string,
+  documentId: string,
+  linkId: string,
+): Promise<ActionResult<{ revoked: true }>> {
+  try {
+    await serverApi(`/documents/${documentId}/public-links/${linkId}`, {
+      method: 'DELETE',
+    });
+    revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
+    return { ok: true, data: { revoked: true } };
+  } catch (error) {
+    return actionError(error, 'Revoke link failed');
+  }
+}
+
+export async function createCommentThreadAction(
+  documentId: string,
+  input: { blockId: string; body: string },
+): Promise<ActionResult<unknown>> {
+  try {
+    const data = await serverApi(`/documents/${documentId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Comment failed');
+  }
+}
+
+export async function addCommentAction(
+  threadId: string,
+  body: string,
+): Promise<ActionResult<unknown>> {
+  try {
+    const data = await serverApi(`/comment-threads/${threadId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    });
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Reply failed');
+  }
+}
+
+export async function resolveCommentThreadAction(
+  threadId: string,
+): Promise<ActionResult<unknown>> {
+  try {
+    const data = await serverApi(`/comment-threads/${threadId}/resolve`, {
+      method: 'POST',
+    });
+    return { ok: true, data };
+  } catch (error) {
+    return actionError(error, 'Resolve failed');
+  }
+}
+
+export async function markNotificationReadAction(
+  notificationId: string,
+): Promise<ActionResult<{ ok: true }>> {
+  try {
+    await serverApi(`/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+    });
+    return { ok: true, data: { ok: true } };
+  } catch (error) {
+    return actionError(error, 'Mark read failed');
+  }
+}

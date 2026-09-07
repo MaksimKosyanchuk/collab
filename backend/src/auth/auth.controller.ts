@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Post,
   Req,
@@ -15,6 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { CurrentUser, AuthUser } from './current-user.decorator';
 
 const REFRESH_COOKIE = 'refreshToken';
 
@@ -77,6 +79,13 @@ export class AuthController {
         : undefined;
     await this.auth.logout(dto.refreshToken ?? cookieToken);
     res.clearCookie(REFRESH_COOKIE);
+  }
+
+  @Get('me')
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: AuthUser) {
+    return user;
   }
 
   private setRefreshCookie(res: Response, token: string) {

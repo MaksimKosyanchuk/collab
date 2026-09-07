@@ -4,7 +4,11 @@ import { useMemo, useState, useTransition } from 'react';
 import {
   createPublicLinkAction,
   publishDocumentAction,
+  revokePublicLinkAction,
   shareDocumentAction,
+  unshareDocumentAction,
+  updateDocumentShareAccessAction,
+  updatePublicLinkAccessAction,
 } from '@/lib/actions';
 import type {
   DocumentAccess,
@@ -40,6 +44,7 @@ export function DocumentAccessPanel({
   const [shareEmail, setShareEmail] = useState('');
   const [shareAccess, setShareAccess] = useState<DocumentAccess>('VIEW');
   const [linkAccess, setLinkAccess] = useState<DocumentAccess>('VIEW');
+  const [linkDays, setLinkDays] = useState('0');
   const [freshLink, setFreshLink] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -202,14 +207,75 @@ export function DocumentAccessPanel({
                 {doc.shares.map((share) => (
                   <li
                     key={share.id}
-                    className="flex items-center justify-between gap-2 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
                   >
                     <span className="truncate">
                       {share.user.displayName}
                       <span className="text-muted"> · {share.user.email}</span>
                     </span>
-                    <span className="shrink-0 text-xs uppercase tracking-wide text-muted">
-                      {share.access}
+                    <span className="flex shrink-0 items-center gap-2">
+                      <select
+                        className="field !w-auto !py-1 !text-xs"
+                        value={share.access === 'MANAGE' ? 'EDIT' : share.access}
+                        disabled={pending}
+                        onChange={(event) => {
+                          const access = event.target.value as DocumentAccess;
+                          run(async () => {
+                            const result = await updateDocumentShareAccessAction(
+                              workspaceId,
+                              documentId,
+                              { userId: share.userId, access },
+                            );
+                            if (!result.ok) {
+                              setError(result.error);
+                              return;
+                            }
+                            setDoc((prev) => ({
+                              ...prev,
+                              shares: prev.shares.map((row) =>
+                                row.userId === share.userId
+                                  ? { ...row, access: result.data.access }
+                                  : row,
+                              ),
+                            }));
+                            setMessage(
+                              `Updated ${share.user.displayName} to ${access}.`,
+                            );
+                          });
+                        }}
+                      >
+                        <option value="VIEW">View</option>
+                        <option value="EDIT">Edit</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="text-xs text-danger"
+                        disabled={pending}
+                        onClick={() =>
+                          run(async () => {
+                            const result = await unshareDocumentAction(
+                              workspaceId,
+                              documentId,
+                              share.userId,
+                            );
+                            if (!result.ok) {
+                              setError(result.error);
+                              return;
+                            }
+                            setDoc((prev) => ({
+                              ...prev,
+                              shares: prev.shares.filter(
+                                (row) => row.userId !== share.userId,
+                              ),
+                            }));
+                            setMessage(
+                              `Removed share for ${share.user.displayName}.`,
+                            );
+                          })
+                        }
+                      >
+                        Remove
+                      </button>
                     </span>
                   </li>
                 ))}
@@ -235,16 +301,31 @@ export function DocumentAccessPanel({
               <option value="VIEW">View link</option>
               <option value="EDIT">Edit link</option>
             </select>
+            <select
+              className="field mt-2"
+              value={linkDays}
+              onChange={(event) => setLinkDays(event.target.value)}
+            >
+              <option value="0">No expiry</option>
+              <option value="1">Expires in 1 day</option>
+              <option value="7">Expires in 7 days</option>
+              <option value="30">Expires in 30 days</option>
+            </select>
             <button
               type="button"
               className="btn btn-ghost mt-2 w-full"
               disabled={pending}
               onClick={() =>
                 run(async () => {
+                  const days = Number(linkDays);
+                  const expiresAt =
+                    days > 0
+                      ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+                      : undefined;
                   const result = await createPublicLinkAction(
                     documentId,
                     workspaceId,
-                    { access: linkAccess },
+                    { access: linkAccess, expiresAt },
                   );
                   if (!result.ok) {
                     setError(result.error);
@@ -297,13 +378,82 @@ export function DocumentAccessPanel({
               </div>
             ) : null}
             {doc.publicLinks.length > 0 ? (
-              <ul className="mt-3 space-y-1 text-sm text-muted">
+              <ul className="mt-3 space-y-2">
                 {doc.publicLinks.map((link) => (
-                  <li key={link.id}>
-                    {link.tokenPrefix}… · {link.access}
-                    {link.expiresAt
-                      ? ` · expires ${new Date(link.expiresAt).toLocaleDateString()}`
-                      : ''}
+                  <li
+                    key={link.id}
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="text-muted">
+                      {link.tokenPrefix}…
+                      {link.expiresAt
+                        ? ` · expires ${new Date(link.expiresAt).toLocaleDateString()}`
+                        : ' · no expiry'}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <select
+                        className="field !w-auto !py-1 !text-xs"
+                        value={link.access === 'MANAGE' ? 'EDIT' : link.access}
+                        disabled={pending}
+                        onChange={(event) => {
+                          const access = event.target.value as DocumentAccess;
+                          run(async () => {
+                            const result = await updatePublicLinkAccessAction(
+                              workspaceId,
+                              documentId,
+                              link.id,
+                              access,
+                            );
+                            if (!result.ok) {
+                              setError(result.error);
+                              return;
+                            }
+                            setDoc((prev) => ({
+                              ...prev,
+                              publicLinks: prev.publicLinks.map((row) =>
+                                row.id === link.id
+                                  ? { ...row, access: result.data.access }
+                                  : row,
+                              ),
+                            }));
+                            setMessage(`Link ${link.tokenPrefix}… → ${access}.`);
+                          });
+                        }}
+                      >
+                        <option value="VIEW">View</option>
+                        <option value="EDIT">Edit</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="text-xs text-danger"
+                        disabled={pending}
+                        onClick={() =>
+                          run(async () => {
+                            const result = await revokePublicLinkAction(
+                              workspaceId,
+                              documentId,
+                              link.id,
+                            );
+                            if (!result.ok) {
+                              setError(result.error);
+                              return;
+                            }
+                            setDoc((prev) => ({
+                              ...prev,
+                              publicLinks: prev.publicLinks.filter(
+                                (row) => row.id !== link.id,
+                              ),
+                            }));
+                            if (freshLink?.includes(link.tokenPrefix)) {
+                              setFreshLink(null);
+                            }
+                            setMessage(`Revoked link ${link.tokenPrefix}…`);
+                          })
+                        }
+                      >
+                        Delete
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ul>

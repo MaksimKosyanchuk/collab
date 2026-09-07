@@ -1,8 +1,10 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import {
   inviteWorkspaceMemberAction,
+  leaveWorkspaceAction,
   removeWorkspaceMemberAction,
   updateWorkspaceMemberRoleAction,
 } from '@/lib/actions';
@@ -26,13 +28,16 @@ export function WorkspaceMembersPanel({
   members: initialMembers,
   invitations: initialInvitations,
   myRole,
+  currentUserId,
 }: {
   workspaceId: string;
   members: WorkspaceMember[];
   invitations: WorkspaceInvitation[];
   myRole: WorkspaceRole | null;
+  currentUserId: string;
 }) {
   const canManage = myRole === 'OWNER' || myRole === 'ADMIN';
+  const router = useRouter();
   const [members, setMembers] = useState(initialMembers);
   const [invitations, setInvitations] = useState(initialInvitations);
   const [email, setEmail] = useState('');
@@ -77,7 +82,12 @@ export function WorkspaceMembersPanel({
             className="flex flex-wrap items-center justify-between gap-2 border-b border-line/70 pb-3 last:border-0 last:pb-0"
           >
             <div className="min-w-0">
-              <p className="truncate font-medium">{member.user.displayName}</p>
+              <p className="truncate font-medium">
+                {member.user.displayName}
+                {member.userId === currentUserId ? (
+                  <span className="text-muted"> (you)</span>
+                ) : null}
+              </p>
               <p className="truncate text-sm text-muted">{member.user.email}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -244,6 +254,29 @@ export function WorkspaceMembersPanel({
               ))}
             </ul>
           ) : null}
+        </div>
+      ) : null}
+
+      {myRole && myRole !== 'OWNER' ? (
+        <div className="mt-6 border-t border-line pt-5">
+          <button
+            type="button"
+            className="btn btn-danger w-full"
+            disabled={pending}
+            onClick={() =>
+              run(async () => {
+                const result = await leaveWorkspaceAction(workspaceId);
+                if (!result.ok) {
+                  setError(result.error);
+                  return;
+                }
+                router.push('/app');
+                router.refresh();
+              })
+            }
+          >
+            Leave workspace
+          </button>
         </div>
       ) : null}
 

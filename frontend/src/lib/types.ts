@@ -19,6 +19,14 @@ export type Workspace = {
   createdAt: string;
 };
 
+export type WorkspaceSubscription = {
+  id: string;
+  workspaceId: string;
+  plan: 'FREE' | 'PRO' | 'TEAM';
+  status: string;
+  currentPeriodEnd: string | null;
+};
+
 export type DocumentTreeItem = {
   id: string;
   parentId: string | null;
@@ -56,6 +64,19 @@ export type WorkspaceDetail = Workspace & {
   members: WorkspaceMember[];
   invitations: WorkspaceInvitation[];
   myRole: WorkspaceRole | null;
+  subscription?: WorkspaceSubscription | null;
+};
+
+export type SharedDocumentItem = {
+  shareId: string;
+  access: DocumentAccess;
+  documentId: string;
+  title: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  publicationStatus: 'UNPUBLISHED' | 'PUBLISHED';
+  updatedAt: string;
 };
 
 export type DocumentShare = {

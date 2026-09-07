@@ -163,6 +163,17 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
           socket.close();
           return;
         }
+        if (message.type === 'access_revoked') {
+          deletedRef.current = true;
+          setConn('revoked');
+          setCanEdit(false);
+          socket.close();
+          return;
+        }
+        if (message.type === 'access' && typeof message.canEdit === 'boolean') {
+          setCanEdit(message.canEdit);
+          return;
+        }
         if (message.type === 'sync' || message.type === 'update') {
           const updateB64 = String(message.update ?? '');
           if (!updateB64) return;

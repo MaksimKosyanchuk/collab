@@ -46,6 +46,13 @@ export class DocumentsController {
 
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
+  @Get('documents/shared')
+  listSharedWithMe(@CurrentUser() user: AuthUser) {
+    return this.documents.listSharedWithMe(user.id);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   @Get('workspaces/:workspaceId/documents')
   tree(
     @CurrentUser() user: AuthUser,
@@ -132,6 +139,17 @@ export class DocumentsController {
 
   @ApiBearerAuth('JWT-auth')
   @UseGuards(JwtAuthGuard)
+  @Delete('documents/:documentId/shares/:shareUserId')
+  unshare(
+    @CurrentUser() user: AuthUser,
+    @Param('documentId') documentId: string,
+    @Param('shareUserId') shareUserId: string,
+  ) {
+    return this.documents.unshare(documentId, { userId: user.id }, shareUserId);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('documents/:documentId/public-links')
   createPublicLink(
@@ -145,6 +163,36 @@ export class DocumentsController {
       user.id,
       dto,
     );
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Patch('documents/:documentId/public-links/:linkId')
+  updatePublicLink(
+    @CurrentUser() user: AuthUser,
+    @Param('documentId') documentId: string,
+    @Param('linkId') linkId: string,
+    @Body() dto: CreatePublicLinkDto,
+  ) {
+    return this.documents.updatePublicLink(
+      documentId,
+      linkId,
+      { userId: user.id },
+      dto.access,
+    );
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  @Delete('documents/:documentId/public-links/:linkId')
+  revokePublicLink(
+    @CurrentUser() user: AuthUser,
+    @Param('documentId') documentId: string,
+    @Param('linkId') linkId: string,
+  ) {
+    return this.documents.revokePublicLink(documentId, linkId, {
+      userId: user.id,
+    });
   }
 
   @ApiBearerAuth('JWT-auth')

@@ -94,6 +94,13 @@ export class CollabGateway
       this.clients.delete(socket);
       return;
     }
+
+    const accessState = await this.rooms.revalidateClient(room, client);
+    if (accessState === 'kicked') {
+      this.clients.delete(socket);
+      return;
+    }
+
     if (message.type === 'update') {
       this.rooms.applyClientUpdate(room, client, message.update);
       return;
@@ -144,10 +151,12 @@ export class CollabGateway
       const client: RoomClient = {
         socket,
         documentId: message.documentId,
+        workspaceId: room.workspaceId,
         userId,
         displayName,
         canEdit: canEdit(resolved.level),
         color: this.rooms.nextColor(room),
+        shareToken: message.shareToken ?? null,
       };
       this.clients.set(socket, client);
       this.rooms.addClient(room, client);

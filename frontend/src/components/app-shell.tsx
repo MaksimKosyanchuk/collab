@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { logoutAction } from '@/lib/actions';
+import { NotificationsBell } from '@/components/notifications-bell';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -9,11 +10,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/app" className="brand text-2xl">
             Collab Docs
           </Link>
-          <form action={logoutAction}>
-            <button className="btn btn-ghost" type="submit">
-              Sign out
-            </button>
-          </form>
+          <div className="flex items-center gap-2">
+            <NotificationsBell />
+            <form action={logoutAction}>
+              <button className="btn btn-ghost" type="submit">
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-5 py-8">{children}</main>

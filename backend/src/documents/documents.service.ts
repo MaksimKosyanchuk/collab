@@ -166,6 +166,40 @@ export class DocumentsService {
     };
   }
 
+  async listSharedWithMe(userId: string) {
+    const shares = await this.prisma.documentShare.findMany({
+      where: {
+        userId,
+        document: { deletedAt: null },
+      },
+      include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            workspaceId: true,
+            publicationStatus: true,
+            updatedAt: true,
+            workspace: { select: { id: true, name: true, slug: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return shares.map((share) => ({
+      shareId: share.id,
+      access: share.access,
+      documentId: share.document.id,
+      title: share.document.title,
+      workspaceId: share.document.workspaceId,
+      workspaceName: share.document.workspace.name,
+      workspaceSlug: share.document.workspace.slug,
+      publicationStatus: share.document.publicationStatus,
+      updatedAt: share.document.updatedAt,
+    }));
+  }
+
   async rename(documentId: string, ctx: AccessContext, title: string) {
     await this.access.assertDocumentEdit(documentId, ctx);
     const document = await this.prisma.document.update({
@@ -325,7 +359,21 @@ export class DocumentsService {
         },
       },
     });
+    await this.rooms.revalidateUserOnDocument(documentId, userId);
     return share;
+  }
+
+  async unshare(
+    documentId: string,
+    ctx: AccessContext,
+    shareUserId: string,
+  ) {
+    await this.access.assertDocumentManage(documentId, ctx);
+    await this.prisma.documentShare.deleteMany({
+      where: { documentId, userId: shareUserId },
+    });
+    await this.rooms.revalidateUserOnDocument(documentId, shareUserId);
+    return { removed: true };
   }
 
   async createPublicLink(
@@ -350,6 +398,57 @@ export class DocumentsService {
       },
     });
     return { id: link.id, token, access: link.access, expiresAt: link.expiresAt };
+  }
+
+  async updatePublicLink(
+    documentId: string,
+    linkId: string,
+    ctx: AccessContext,
+    access: 'VIEW' | 'EDIT' | 'MANAGE',
+  ) {
+    await this.access.assertDocumentManage(documentId, ctx);
+    if (access === 'MANAGE') {
+      throw new BadRequestException('Public links cannot grant MANAGE');
+    }
+    const existing = await this.prisma.documentPublicLink.findFirst({
+      where: { id: linkId, documentId, revokedAt: null },
+    });
+    if (!existing) {
+      throw new NotFoundException('Public link not found');
+    }
+    const link = await this.prisma.documentPublicLink.update({
+      where: { id: linkId },
+      data: { access },
+      select: {
+        id: true,
+        tokenPrefix: true,
+        access: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
+    await this.rooms.revalidateAllClientsOnDocument(documentId);
+    return link;
+  }
+
+  async revokePublicLink(
+    documentId: string,
+    linkId: string,
+    ctx: AccessContext,
+  ) {
+    await this.access.assertDocumentManage(documentId, ctx);
+    const existing = await this.prisma.documentPublicLink.findFirst({
+      where: { id: linkId, documentId, revokedAt: null },
+    });
+    if (!existing) {
+      throw new NotFoundException('Public link not found');
+    }
+    await this.prisma.documentPublicLink.update({
+      where: { id: linkId },
+      data: { revokedAt: new Date() },
+    });
+    await this.rooms.revalidateAllClientsOnDocument(documentId);
+    return { revoked: true, id: linkId };
   }
 
   async listVersions(documentId: string, ctx: AccessContext) {

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { DocumentAccessPanel } from '@/components/document-access-panel';
+import { BlockComments } from '@/components/block-comments';
 import { BLOCK_TYPES, type BlockType } from '@/lib/blocks';
 import { useCollabDoc } from '@/hooks/use-collab-doc';
 import type { DocumentDetail, WorkspaceMember } from '@/lib/types';
@@ -45,6 +46,20 @@ export function CollabEditor({
         </p>
         <Link href={`/app/w/${workspaceId}`} className="btn btn-primary mt-6">
           Back to workspace
+        </Link>
+      </div>
+    );
+  }
+
+  if (conn === 'revoked') {
+    return (
+      <div className="panel rounded-[1.5rem] p-8">
+        <h1 className="text-2xl font-semibold">Access revoked</h1>
+        <p className="mt-2 text-muted">
+          Your permission to this page was removed. Live editing is closed.
+        </p>
+        <Link href="/app" className="btn btn-primary mt-6">
+          Back to app
         </Link>
       </div>
     );
@@ -235,6 +250,12 @@ export function CollabEditor({
                     </button>
                   </div>
                 ) : null}
+                <BlockComments
+                  documentId={documentId}
+                  blockId={block.id}
+                  canComment={canEdit && conn === 'online'}
+                  mentionHints={members.map((member) => member.user.displayName)}
+                />
               </div>
             ))
           )}

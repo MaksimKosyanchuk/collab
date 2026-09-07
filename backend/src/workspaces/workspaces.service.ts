@@ -6,6 +6,7 @@ import {
 import { PlanTier, Workspace, WorkspaceRole } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { AccessService, hashToken } from '../access/access.service';
+import { CollabRoomsService } from '../collab/collab-rooms.service';
 import { PlanLimitException } from '../common/exceptions/plan-limit.exception';
 import { slugify } from '../common/ids';
 import { PLAN_LIMITS } from '../common/plan-limits';
@@ -26,6 +27,7 @@ export class WorkspacesService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly outbox: OutboxService,
+    private readonly rooms: CollabRoomsService,
   ) {}
 
   async create(userId: string, dto: CreateWorkspaceDto) {
@@ -258,10 +260,13 @@ export class WorkspacesService {
     if (member.role === WorkspaceRole.OWNER) {
       throw new BadRequestException('Cannot change the owner role');
     }
-    return this.prisma.workspaceMember.update({
+    await this.assertNotLastManager(workspaceId, memberUserId, role);
+    const updated = await this.prisma.workspaceMember.update({
       where: { id: member.id },
       data: { role },
     });
+    await this.rooms.revalidateUserInWorkspace(workspaceId, memberUserId);
+    return updated;
   }
 
   async removeMember(
@@ -279,7 +284,58 @@ export class WorkspacesService {
     if (member.role === WorkspaceRole.OWNER) {
       throw new BadRequestException('Cannot remove the owner');
     }
+    await this.assertNotLastManager(workspaceId, memberUserId, null);
     await this.prisma.workspaceMember.delete({ where: { id: member.id } });
+    await this.rooms.revalidateUserInWorkspace(workspaceId, memberUserId);
+  }
+
+  async leave(workspaceId: string, userId: string) {
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+    if (!member) {
+      throw new NotFoundException('You are not a member of this workspace');
+    }
+    if (member.role === WorkspaceRole.OWNER) {
+      throw new BadRequestException(
+        'Owner cannot leave; transfer ownership or delete the workspace',
+      );
+    }
+    await this.assertNotLastManager(workspaceId, userId, null);
+    await this.prisma.workspaceMember.delete({ where: { id: member.id } });
+    await this.rooms.revalidateUserInWorkspace(workspaceId, userId);
+    return { left: true, workspaceId };
+  }
+
+  /**
+   * Keep at least one OWNER/ADMIN. Demotion/removal/leave of a manager is
+   * blocked when they are the last remaining manager.
+   */
+  private async assertNotLastManager(
+    workspaceId: string,
+    memberUserId: string,
+    nextRole: WorkspaceRole | null,
+  ) {
+    if (nextRole === WorkspaceRole.OWNER || nextRole === WorkspaceRole.ADMIN) {
+      return;
+    }
+    const managers = await this.prisma.workspaceMember.findMany({
+      where: {
+        workspaceId,
+        role: { in: [WorkspaceRole.OWNER, WorkspaceRole.ADMIN] },
+      },
+      select: { userId: true, role: true },
+    });
+    const isManager = managers.some((row) => row.userId === memberUserId);
+    if (!isManager) {
+      return;
+    }
+    const remaining = managers.filter((row) => row.userId !== memberUserId);
+    if (remaining.length === 0) {
+      throw new BadRequestException(
+        'Cannot remove or demote the last workspace admin',
+      );
+    }
   }
 
   private async assertMemberLimit(workspaceId: string, plan: PlanTier) {
