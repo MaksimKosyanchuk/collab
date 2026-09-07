@@ -61,7 +61,17 @@ export class WorkspacesService {
     await this.access.assertWorkspaceMember(workspaceId, userId);
     const workspace = await this.prisma.workspace.findUnique({
       where: { id: workspaceId },
-      include: { members: true, subscription: true },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: { id: true, email: true, displayName: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        subscription: true,
+      },
     });
     if (!workspace) {
       throw new NotFoundException('Workspace not found');

@@ -111,10 +111,59 @@ export class DocumentsService {
       documentId,
       ctx,
     );
-    const projection = await this.prisma.documentProjection.findUnique({
-      where: { documentId },
-    });
-    return { ...document, access: level, projection };
+    const [projection, shares, publicLinks] = await Promise.all([
+      this.prisma.documentProjection.findUnique({
+        where: { documentId },
+      }),
+      this.prisma.documentShare.findMany({
+        where: { documentId },
+        include: {
+          user: {
+            select: { id: true, email: true, displayName: true },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.documentPublicLink.findMany({
+        where: { documentId, revokedAt: null },
+        select: {
+          id: true,
+          tokenPrefix: true,
+          access: true,
+          expiresAt: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    return {
+      ...document,
+      access: level,
+      projection,
+      shares,
+      publicLinks,
+    };
+  }
+
+  async getShared(documentId: string, shareToken: string) {
+    if (!shareToken.trim()) {
+      throw new BadRequestException('Share token is required');
+    }
+    const { document, level } = await this.access.assertDocumentView(
+      documentId,
+      { shareToken },
+    );
+    return {
+      id: document.id,
+      workspaceId: document.workspaceId,
+      title: document.title,
+      publicationStatus: document.publicationStatus,
+      publicSlug: document.publicSlug,
+      publishedAt: document.publishedAt,
+      access: level,
+      shares: [],
+      publicLinks: [],
+    };
   }
 
   async rename(documentId: string, ctx: AccessContext, title: string) {
@@ -247,17 +296,36 @@ export class DocumentsService {
     if (dto.access === 'MANAGE') {
       throw new BadRequestException('MANAGE is reserved for workspace admins');
     }
-    return this.prisma.documentShare.upsert({
+    let userId = dto.userId;
+    if (!userId && dto.email) {
+      const user = await this.prisma.user.findUnique({
+        where: { email: dto.email.toLowerCase().trim() },
+      });
+      if (!user) {
+        throw new NotFoundException('User with this email is not registered');
+      }
+      userId = user.id;
+    }
+    if (!userId) {
+      throw new BadRequestException('userId or email is required');
+    }
+    const share = await this.prisma.documentShare.upsert({
       where: {
-        documentId_userId: { documentId, userId: dto.userId },
+        documentId_userId: { documentId, userId },
       },
       update: { access: dto.access },
       create: {
         documentId,
-        userId: dto.userId,
+        userId,
         access: dto.access,
       },
+      include: {
+        user: {
+          select: { id: true, email: true, displayName: true },
+        },
+      },
     });
+    return share;
   }
 
   async createPublicLink(

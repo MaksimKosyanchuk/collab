@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -31,6 +32,16 @@ export class DocumentsController {
   @Get('public/documents/:slug')
   getPublished(@Param('slug') slug: string) {
     return this.documents.getPublished(slug);
+  }
+
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get('public/documents/:documentId/shared')
+  getShared(
+    @Param('documentId') documentId: string,
+    @Query('token') token?: string,
+    @Headers('x-share-token') shareToken?: string,
+  ) {
+    return this.documents.getShared(documentId, token ?? shareToken ?? '');
   }
 
   @ApiBearerAuth('JWT-auth')

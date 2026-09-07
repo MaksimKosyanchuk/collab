@@ -1,4 +1,5 @@
 import { IncomingMessage } from 'http';
+import { randomUUID } from 'crypto';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -17,7 +18,7 @@ import { CollabRoomsService, RoomClient } from './collab-rooms.service';
 type JoinMessage = {
   type: 'join';
   documentId: string;
-  token: string;
+  token?: string;
   shareToken?: string;
 };
 
@@ -47,14 +48,15 @@ export class CollabGateway
       void this.onMessage(socket, raw.toString());
     });
     const url = new URL(request.url ?? '/', 'http://localhost');
-    const token = url.searchParams.get('token');
+    const token = url.searchParams.get('token') ?? undefined;
+    const shareToken = url.searchParams.get('shareToken') ?? undefined;
     const documentId = url.searchParams.get('documentId');
-    if (token && documentId) {
+    if (documentId && (token || shareToken)) {
       void this.join(socket, {
         type: 'join',
         documentId,
         token,
-        shareToken: url.searchParams.get('shareToken') ?? undefined,
+        shareToken,
       });
     }
   }
@@ -110,26 +112,40 @@ export class CollabGateway
 
   private async join(socket: WebSocket, message: JoinMessage): Promise<void> {
     try {
-      const payload = await this.jwt.verifyAsync<JwtPayload>(message.token, {
-        secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
-      });
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-      });
-      if (!user) {
+      let userId: string;
+      let displayName: string;
+
+      if (message.token) {
+        const payload = await this.jwt.verifyAsync<JwtPayload>(message.token, {
+          secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+        });
+        const user = await this.prisma.user.findUnique({
+          where: { id: payload.sub },
+        });
+        if (!user) {
+          socket.close(4401, 'Unauthorized');
+          return;
+        }
+        userId = user.id;
+        displayName = user.displayName;
+      } else if (message.shareToken) {
+        userId = `guest:${randomUUID()}`;
+        displayName = 'Guest';
+      } else {
         socket.close(4401, 'Unauthorized');
         return;
       }
+
       const resolved = await this.access.assertDocumentView(message.documentId, {
-        userId: user.id,
+        userId: message.token ? userId : null,
         shareToken: message.shareToken,
       });
       const room = await this.rooms.getRoom(message.documentId);
       const client: RoomClient = {
         socket,
         documentId: message.documentId,
-        userId: user.id,
-        displayName: user.displayName,
+        userId,
+        displayName,
         canEdit: canEdit(resolved.level),
         color: this.rooms.nextColor(room),
       };

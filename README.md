@@ -27,14 +27,14 @@ Join payload (JSON): `{ "type": "join", "documentId", "token" }`. Updates: `{ "t
 
 ```bash
 docker compose up -d
-cd backend
-cp .env.example .env   # already present locally
-npx prisma migrate dev
-npm run start:dev
+cd backend && npm run start:dev
+
+# other terminal
+cd frontend && npm run dev
 ```
 
-- API: http://localhost:3001
-- Swagger: http://localhost:3001/api/docs
+- API: http://localhost:3001 · Swagger `/api/docs`
+- App: http://localhost:3000 · public pages `/p/[slug]`
 - Postgres `5432`, Redis `6379`, MinIO `9000`/`9001`, Meilisearch `7700`
 
-Data model: `docs/DATA_MODEL.md`. Working memory: `docs/PROJECT_HANDOFF.md`.
+Server Components for lists/public pages; Client Components only where interactivity is required (auth forms today; editor next). CRDT edits go through WebSocket, not Server Actions.

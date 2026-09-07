@@ -2,11 +2,13 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DocumentAccess } from '@prisma/client';
 import {
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateDocumentDto {
@@ -42,9 +44,15 @@ export class RenameDocumentDto {
 }
 
 export class ShareDocumentDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @ValidateIf((dto: ShareDocumentDto) => !dto.email)
   @IsUUID()
-  userId: string;
+  userId?: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((dto: ShareDocumentDto) => !dto.userId)
+  @IsEmail()
+  email?: string;
 
   @ApiProperty({ enum: DocumentAccess })
   @IsEnum(DocumentAccess)
