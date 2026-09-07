@@ -165,6 +165,8 @@ export class CollabGateway
           type: 'sync',
           update: this.rooms.encodeState(room),
           canEdit: client.canEdit,
+          userId: client.userId,
+          displayName: client.displayName,
         }),
       );
     } catch (error) {

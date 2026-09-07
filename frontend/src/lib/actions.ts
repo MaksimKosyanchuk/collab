@@ -8,9 +8,9 @@ import {
   REFRESH_COOKIE,
   apiFetch,
   safeNextPath,
-  serverApi,
 } from './api';
-import { workspaceTreeTag } from './workspace-tree';
+import { serverApi } from './server-api';
+import { workspaceTreeTag } from './cache-tags';
 import type {
   AssetConfirm,
   AssetPresign,
@@ -21,7 +21,6 @@ import type {
   DocumentTreeItem,
   DocumentVersion,
   Workspace,
-  WorkspaceMember,
   WorkspaceRole,
 } from './types';
 

@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import type { ApiErrorBody } from './types';
 
 export const ACCESS_COOKIE = 'collab_access';
@@ -50,32 +49,6 @@ export async function apiFetch<T>(
   }
 
   return body as T;
-}
-
-export async function getAccessToken(): Promise<string | null> {
-  const jar = await cookies();
-  return jar.get(ACCESS_COOKIE)?.value ?? null;
-}
-
-export async function serverApi<T>(
-  path: string,
-  init: RequestInit = {},
-): Promise<T> {
-  const token = await getAccessToken();
-  if (!token) {
-    throw new ApiError(401, { message: 'Unauthorized' });
-  }
-  return apiFetch<T>(path, { ...init, accessToken: token });
-}
-
-export async function serverApiWithShareToken<T>(
-  path: string,
-  shareToken: string,
-  init: RequestInit = {},
-): Promise<T> {
-  const headers = new Headers(init.headers);
-  headers.set('x-share-token', shareToken);
-  return serverApi<T>(path, { ...init, headers });
 }
 
 export function safeNextPath(next: string | null | undefined): string | null {

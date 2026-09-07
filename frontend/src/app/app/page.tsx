@@ -1,5 +1,5 @@
 import { WorkspaceList } from '@/components/workspace-list';
-import { serverApi } from '@/lib/api';
+import { serverApi } from '@/lib/server-api';
 import type { SharedDocumentItem, Workspace } from '@/lib/types';
 
 export default async function AppHomePage() {

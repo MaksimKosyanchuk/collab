@@ -73,6 +73,7 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
   const [title, setTitle] = useState('Untitled');
   const [blocks, setBlocks] = useState<EditorBlock[]>([]);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
+  const [localUserId, setLocalUserId] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [conn, setConn] = useState<ConnState>('connecting');
   const [browserOnline, setBrowserOnline] = useState(true);
@@ -99,6 +100,7 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
   useEffect(() => {
     let cancelled = false;
     deletedRef.current = false;
+    setLocalUserId(null);
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
@@ -192,8 +194,13 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
           applyingRemote.current = true;
           Y.applyUpdate(ydoc, fromBase64(updateB64), 'remote');
           applyingRemote.current = false;
-          if (message.type === 'sync' && typeof message.canEdit === 'boolean') {
-            setCanEdit(message.canEdit);
+          if (message.type === 'sync') {
+            if (typeof message.canEdit === 'boolean') {
+              setCanEdit(message.canEdit);
+            }
+            if (typeof message.userId === 'string') {
+              setLocalUserId(message.userId);
+            }
           }
           refreshLocal();
           return;
@@ -330,6 +337,7 @@ export function useCollabDoc(documentId: string, shareToken?: string | null) {
     title,
     blocks,
     presence,
+    localUserId,
     canEdit,
     conn,
     browserOnline,

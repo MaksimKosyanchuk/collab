@@ -1,11 +1,10 @@
 import { unstable_cache } from 'next/cache';
-import { ApiError, apiFetch, getAccessToken } from './api';
+import { ApiError, apiFetch } from './api';
+import { workspaceTreeTag } from './cache-tags';
+import { getAccessToken } from './server-api';
 import type { DocumentTreeItem } from './types';
 
-/** Cache tag for workspace document tree — invalidate on create / move / delete / title flush. */
-export function workspaceTreeTag(workspaceId: string): string {
-  return `workspace-tree:${workspaceId}`;
-}
+export { workspaceTreeTag } from './cache-tags';
 
 /**
  * Cached read of the workspace document tree (TZ: cache reads + invalidate on change).

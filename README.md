@@ -88,6 +88,14 @@ cd backend && npm run start:dev
 cd frontend && npm run dev
 ```
 
+### Tests (TZ §5)
+
+```bash
+cd backend
+npm test          # unit: ACL, CRDT merge, billing webhook idempotency, persistence, revalidate
+npm run test:e2e  # critical flows: Viewer ACL, concurrent collab, publish/public payload
+```
+
 - API: http://localhost:3001 · Swagger `/api/docs`
 - App: http://localhost:3000 · public pages `/p/[slug]`
 - Postgres `5432`, Redis `6379`, MinIO `9000`/`9001`, Meilisearch `7700`

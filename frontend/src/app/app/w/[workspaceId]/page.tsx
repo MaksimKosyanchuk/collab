@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { DocumentTree } from '@/components/document-tree';
-import { serverApi } from '@/lib/api';
+import { serverApi } from '@/lib/server-api';
 import { getCachedWorkspaceTree } from '@/lib/workspace-tree';
 import type { AuthUser, WorkspaceDetail } from '@/lib/types';
 

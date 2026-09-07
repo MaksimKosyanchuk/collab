@@ -1,5 +1,5 @@
 import { CollabEditor } from '@/components/collab-editor';
-import { serverApi } from '@/lib/api';
+import { serverApi } from '@/lib/server-api';
 import type {
   DocumentDetail,
   WorkspaceDetail,

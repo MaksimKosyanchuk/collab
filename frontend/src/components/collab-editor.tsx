@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { DocumentAccessPanel } from '@/components/document-access-panel';
 import { BlockComments } from '@/components/block-comments';
+import { RemoteCaretField } from '@/components/remote-caret-field';
 import { VersionHistoryPanel } from '@/components/version-history-panel';
 import { useToast } from '@/components/toast-provider';
 import { confirmAssetAction, presignAssetAction } from '@/lib/actions';
@@ -131,6 +132,7 @@ export function CollabEditor({
     title,
     blocks,
     presence,
+    localUserId,
     canEdit,
     conn,
     browserOnline,
@@ -171,6 +173,7 @@ export function CollabEditor({
 
   const status = connectionStatusLabel({ conn, browserOnline });
   const editable = canEdit && conn === 'online' && browserOnline;
+  const others = presence.filter((user) => user.userId !== localUserId);
   const statusClass =
     status.tone === 'warn'
       ? 'text-sm font-medium text-[#a16207]'
@@ -200,11 +203,11 @@ export function CollabEditor({
           <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">
             Present
           </p>
-          {presence.length === 0 ? (
+          {others.length === 0 ? (
             <p className="empty">Just you</p>
           ) : (
             <ul className="space-y-1">
-              {presence.map((user) => (
+              {others.map((user) => (
                 <li
                   key={user.userId}
                   className="flex items-center gap-2 text-[13px]"
@@ -254,18 +257,6 @@ export function CollabEditor({
           ) : (
             blocks.map((block) => (
               <div key={block.id} className="group relative">
-                {presence
-                  .filter((user) => user.cursor?.blockId === block.id)
-                  .map((user) => (
-                    <span
-                      key={user.userId}
-                      className="mb-1 mr-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] text-white"
-                      style={{ background: user.color }}
-                    >
-                      {user.displayName}
-                    </span>
-                  ))}
-
                 {block.type === 'checkbox' ? (
                   <label className="flex items-start gap-2">
                     <input
@@ -279,20 +270,19 @@ export function CollabEditor({
                         })
                       }
                     />
-                    <textarea
-                      className="field min-h-[2.25rem] resize-y"
-                      value={block.text}
-                      disabled={!editable}
-                      onChange={(event) =>
-                        updateBlock(block.id, { text: event.target.value })
-                      }
-                      onSelect={(event) =>
-                        setCursor(
-                          block.id,
-                          (event.target as HTMLTextAreaElement).selectionStart,
-                        )
-                      }
-                    />
+                    <div className="min-w-0 flex-1">
+                      <RemoteCaretField
+                        blockId={block.id}
+                        className="field min-h-[2.25rem] resize-y"
+                        value={block.text}
+                        disabled={!editable}
+                        remoteUsers={others}
+                        onCursor={setCursor}
+                        onChange={(event) =>
+                          updateBlock(block.id, { text: event.target.value })
+                        }
+                      />
+                    </div>
                   </label>
                 ) : block.type === 'image' ? (
                   <ImageBlockFields
@@ -306,26 +296,24 @@ export function CollabEditor({
                     }
                   />
                 ) : block.type === 'list' ? (
-                  <textarea
+                  <RemoteCaretField
+                    blockId={block.id}
                     className="field min-h-[4rem] resize-y font-mono text-[13px]"
                     value={(block.items ?? ['']).join('\n')}
                     disabled={!editable}
                     placeholder="One item per line"
+                    remoteUsers={others}
+                    onCursor={setCursor}
                     onChange={(event) =>
                       updateBlock(block.id, {
                         items: event.target.value.split('\n'),
                         text: event.target.value,
                       })
                     }
-                    onSelect={(event) =>
-                      setCursor(
-                        block.id,
-                        (event.target as HTMLTextAreaElement).selectionStart,
-                      )
-                    }
                   />
                 ) : (
-                  <textarea
+                  <RemoteCaretField
+                    blockId={block.id}
                     className={`field resize-y ${
                       block.type === 'heading'
                         ? 'min-h-[2.5rem] text-base font-semibold'
@@ -335,14 +323,10 @@ export function CollabEditor({
                     }`}
                     value={block.text}
                     disabled={!editable}
+                    remoteUsers={others}
+                    onCursor={setCursor}
                     onChange={(event) =>
                       updateBlock(block.id, { text: event.target.value })
-                    }
-                    onSelect={(event) =>
-                      setCursor(
-                        block.id,
-                        (event.target as HTMLTextAreaElement).selectionStart,
-                      )
                     }
                   />
                 )}
