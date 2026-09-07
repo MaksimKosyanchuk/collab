@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+coverage/
+.env
+.env.local
+*.log
+.DS_Store
+
+
+/graphify-out/
+docs/graphify-out/cache/
+docs/graphify-out/.graphify_*.json
+docs/graphify-out/.vocab.txt
+.cursor/
