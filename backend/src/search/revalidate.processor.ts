@@ -3,6 +3,13 @@ import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+type RevalidatePayload = {
+  slug?: string | null;
+  documentId?: string;
+  tag?: string;
+  path?: string;
+};
+
 @Processor('revalidate')
 export class RevalidateProcessor extends WorkerHost {
   private readonly logger = new Logger(RevalidateProcessor.name);
@@ -11,13 +18,13 @@ export class RevalidateProcessor extends WorkerHost {
     super();
   }
 
-  async process(
-    job: Job<{ slug?: string; documentId: string }>,
-  ): Promise<void> {
-    const slug = job.data.slug;
-    if (!slug) {
+  async process(job: Job<RevalidatePayload>): Promise<void> {
+    const slug = job.data.slug ?? undefined;
+    const tag = job.data.tag;
+    const path = job.data.path;
+    if (!slug && !tag && !path) {
       this.logger.warn(
-        `Skip revalidate: no slug for document ${job.data.documentId}`,
+        `Skip revalidate: nothing to invalidate for document ${job.data.documentId ?? '?'}`,
       );
       return;
     }
@@ -29,7 +36,7 @@ export class RevalidateProcessor extends WorkerHost {
 
     if (!secret) {
       this.logger.warn(
-        `REVALIDATE_SECRET missing; logged only for slug=${slug}`,
+        `REVALIDATE_SECRET missing; logged only slug=${slug ?? '-'} tag=${tag ?? '-'}`,
       );
       return;
     }
@@ -43,16 +50,20 @@ export class RevalidateProcessor extends WorkerHost {
       body: JSON.stringify({
         slug,
         documentId: job.data.documentId,
+        tag,
+        path,
       }),
     });
 
     if (!res.ok) {
       const body = await res.text();
       throw new Error(
-        `Next revalidate failed (${res.status}) for ${slug}: ${body}`,
+        `Next revalidate failed (${res.status}): ${body}`,
       );
     }
 
-    this.logger.log(`ISR revalidated public page /p/${slug}`);
+    this.logger.log(
+      `Revalidated ${[slug && `/p/${slug}`, tag, path].filter(Boolean).join(', ')}`,
+    );
   }
 }

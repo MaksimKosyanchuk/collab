@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -10,6 +10,7 @@ import {
   safeNextPath,
   serverApi,
 } from './api';
+import { workspaceTreeTag } from './workspace-tree';
 import type {
   AssetConfirm,
   AssetPresign,
@@ -23,6 +24,11 @@ import type {
   WorkspaceMember,
   WorkspaceRole,
 } from './types';
+
+function invalidateWorkspaceTree(workspaceId: string) {
+  revalidateTag(workspaceTreeTag(workspaceId));
+  revalidatePath(`/app/w/${workspaceId}`);
+}
 
 const cookieOpts = {
   httpOnly: true,
@@ -124,6 +130,7 @@ export async function createDocumentAction(
       body: JSON.stringify({ title, parentId }),
     },
   );
+  invalidateWorkspaceTree(workspaceId);
   redirect(`/app/w/${workspaceId}/d/${doc.id}`);
 }
 
@@ -148,9 +155,10 @@ export async function publishDocumentAction(
     });
     const data = await serverApi<DocumentDetail>(`/documents/${documentId}`);
     revalidatePath(`/app/w/${workspaceId}/d/${documentId}`);
-    revalidatePath(`/app/w/${workspaceId}`);
+    invalidateWorkspaceTree(workspaceId);
     if (data.publicSlug) {
       revalidatePath(`/p/${data.publicSlug}`);
+      revalidateTag(`public-doc:${data.publicSlug}`);
     }
     return { ok: true, data };
   } catch (error) {
@@ -446,7 +454,7 @@ export async function moveDocumentAction(
         body: JSON.stringify(input),
       },
     );
-    revalidatePath(`/app/w/${workspaceId}`);
+    invalidateWorkspaceTree(workspaceId);
     return { ok: true, data };
   } catch (error) {
     return actionError(error, 'Move failed');

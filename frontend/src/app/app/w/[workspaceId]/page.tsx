@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
 import { DocumentTree } from '@/components/document-tree';
 import { serverApi } from '@/lib/api';
-import type { AuthUser, DocumentTreeItem, WorkspaceDetail } from '@/lib/types';
+import { getCachedWorkspaceTree } from '@/lib/workspace-tree';
+import type { AuthUser, WorkspaceDetail } from '@/lib/types';
 
 type Props = {
   params: Promise<{ workspaceId: string }>;
@@ -58,7 +59,7 @@ async function WorkspaceMain({ workspaceId }: { workspaceId: string }) {
   try {
     const [workspace, documents, me] = await Promise.all([
       serverApi<WorkspaceDetail>(`/workspaces/${workspaceId}`),
-      serverApi<DocumentTreeItem[]>(`/workspaces/${workspaceId}/documents`),
+      getCachedWorkspaceTree(workspaceId),
       serverApi<AuthUser>('/auth/me'),
     ]);
 

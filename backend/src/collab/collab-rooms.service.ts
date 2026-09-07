@@ -181,6 +181,56 @@ export class CollabRoomsService {
   }
 
   /**
+   * Force-flush live (or cold) CRDT state into DocumentProjection.
+   * Used before publish so public SSR/ISR does not miss in-flight editor edits
+   * that sat in the debounce window.
+   */
+  async flushProjection(documentId: string): Promise<void> {
+    const room = this.rooms.get(documentId);
+    if (room && !room.closed) {
+      if (room.persistTimer) {
+        clearTimeout(room.persistTimer);
+        room.persistTimer = undefined;
+      }
+      await this.flush(room);
+      return;
+    }
+
+    const document = await this.prisma.document.findFirst({
+      where: { id: documentId, deletedAt: null },
+    });
+    if (!document) {
+      return;
+    }
+
+    const ydoc = await this.persistence.loadDoc(documentId);
+    const projected = projectYDoc(ydoc);
+    ydoc.destroy();
+
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { title: projected.title },
+    });
+    await this.prisma.documentProjection.upsert({
+      where: { documentId },
+      update: {
+        title: projected.title,
+        description: projected.description,
+        blocksJson: projected.blocks,
+        plainText: projected.plainText,
+        projectedAt: new Date(),
+      },
+      create: {
+        documentId,
+        title: projected.title,
+        description: projected.description,
+        blocksJson: projected.blocks,
+        plainText: projected.plainText,
+      },
+    });
+  }
+
+  /**
    * Soft-delete while editors are connected: notify, close sockets, drop room.
    */
   closeDeleted(documentId: string): void {
@@ -366,14 +416,19 @@ export class CollabRoomsService {
       if (room.closed || origin === 'remote' || origin === 'load') {
         return;
       }
-      room.updatesSinceSnapshot += 1;
-      void this.persistence.applyUpdate(room.documentId, update);
+      // Replay of the same payload is ignored by unique(hash); do not bump counters.
+      void this.persistence.applyUpdate(room.documentId, update).then((result) => {
+        if (!result.applied || room.closed) {
+          return;
+        }
+        room.updatesSinceSnapshot += 1;
+        this.schedulePersist(room);
+      });
       this.broadcast(
         room,
         { type: 'update', update: Buffer.from(update).toString('base64') },
         origin as RoomClient | undefined,
       );
-      this.schedulePersist(room);
     });
   }
 
@@ -483,17 +538,20 @@ export class CollabRoomsService {
         workspaceId: document.workspaceId,
       },
     });
-    if (document.publicationStatus === 'PUBLISHED' && document.publicSlug) {
-      await this.outbox.enqueue({
-        type: 'page.revalidate',
-        aggregateType: 'document',
-        aggregateId: room.documentId,
-        idempotencyKey: `revalidate:collab:${room.documentId}:${Date.now()}`,
-        payload: {
-          slug: document.publicSlug,
-          documentId: room.documentId,
-        },
-      });
-    }
+    await this.outbox.enqueue({
+      type: 'page.revalidate',
+      aggregateType: 'document',
+      aggregateId: room.documentId,
+      idempotencyKey: `revalidate:collab:${room.documentId}:${Date.now()}`,
+      payload: {
+        slug:
+          document.publicationStatus === 'PUBLISHED'
+            ? document.publicSlug ?? undefined
+            : undefined,
+        documentId: room.documentId,
+        tag: `workspace-tree:${document.workspaceId}`,
+        path: `/app/w/${document.workspaceId}`,
+      },
+    });
   }
 }

@@ -31,11 +31,14 @@ export function DocumentAccessPanel({
   workspaceId,
   documentId,
   initial,
+  liveReady = true,
 }: {
   workspaceId: string;
   documentId: string;
   initial: DocumentDetail;
   members?: WorkspaceMember[];
+  /** False when editor is offline — publish would miss unsynced local edits. */
+  liveReady?: boolean;
 }) {
   const [doc, setDoc] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -86,32 +89,39 @@ export function DocumentAccessPanel({
           <p className="mt-1 text-sm text-muted">Not on the public web yet.</p>
         )}
         {canEdit ? (
-          <button
-            type="button"
-            className={`btn mt-3 w-full ${published ? 'btn-ghost' : 'btn-primary'}`}
-            disabled={pending}
-            onClick={() =>
-              run(async () => {
-                const result = await publishDocumentAction(
-                  documentId,
-                  workspaceId,
-                  !published,
-                );
-                if (!result.ok) {
-                  setError(result.error);
-                  return;
-                }
-                setDoc(result.data);
-                setMessage(
-                  result.data.publicationStatus === 'PUBLISHED'
-                    ? 'Published. Public page will refresh shortly.'
-                    : 'Unpublished.',
-                );
-              })
-            }
-          >
-            {published ? 'Unpublish' : 'Publish page'}
-          </button>
+          <>
+            {!liveReady ? (
+              <p className="mt-2 text-[12px] text-muted">
+                Reconnect to publish the latest live edits.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className={`btn mt-3 w-full ${published ? 'btn-ghost' : 'btn-primary'}`}
+              disabled={pending || (!published && !liveReady)}
+              onClick={() =>
+                run(async () => {
+                  const result = await publishDocumentAction(
+                    documentId,
+                    workspaceId,
+                    !published,
+                  );
+                  if (!result.ok) {
+                    setError(result.error);
+                    return;
+                  }
+                  setDoc(result.data);
+                  setMessage(
+                    result.data.publicationStatus === 'PUBLISHED'
+                      ? 'Published from the live document. Public page will refresh shortly.'
+                      : 'Unpublished.',
+                  );
+                })
+              }
+            >
+              {published ? 'Unpublish' : 'Publish page'}
+            </button>
+          </>
         ) : null}
       </div>
 

@@ -103,6 +103,17 @@ export class DocumentsService {
       idempotencyKey: `search:create:${document.id}`,
       payload: { documentId: document.id, workspaceId },
     });
+    await this.outbox.enqueue({
+      type: 'page.revalidate',
+      aggregateType: 'document',
+      aggregateId: document.id,
+      idempotencyKey: `revalidate:tree:create:${document.id}`,
+      payload: {
+        documentId: document.id,
+        tag: `workspace-tree:${workspaceId}`,
+        path: `/app/w/${workspaceId}`,
+      },
+    });
     return document;
   }
 
@@ -231,6 +242,17 @@ export class DocumentsService {
       data: { title },
     });
     await this.enqueueIndex(document.workspaceId, document.id);
+    await this.outbox.enqueue({
+      type: 'page.revalidate',
+      aggregateType: 'document',
+      aggregateId: document.id,
+      idempotencyKey: `revalidate:tree:rename:${document.id}:${document.updatedAt.toISOString()}`,
+      payload: {
+        documentId: document.id,
+        tag: `workspace-tree:${document.workspaceId}`,
+        path: `/app/w/${document.workspaceId}`,
+      },
+    });
     return document;
   }
 
@@ -260,13 +282,25 @@ export class DocumentsService {
       },
       orderBy: { rank: 'desc' },
     });
-    return this.prisma.document.update({
+    const moved = await this.prisma.document.update({
       where: { id: documentId },
       data: {
         parentId: dto.parentId === undefined ? document.parentId : dto.parentId,
         rank: dto.rank ?? nextRank(last?.rank),
       },
     });
+    await this.outbox.enqueue({
+      type: 'page.revalidate',
+      aggregateType: 'document',
+      aggregateId: documentId,
+      idempotencyKey: `revalidate:tree:move:${documentId}:${moved.updatedAt.toISOString()}`,
+      payload: {
+        documentId,
+        tag: `workspace-tree:${document.workspaceId}`,
+        path: `/app/w/${document.workspaceId}`,
+      },
+    });
+    return moved;
   }
 
   async remove(documentId: string, ctx: AccessContext) {
@@ -284,6 +318,17 @@ export class DocumentsService {
       idempotencyKey: `search:delete:${document.id}:${document.deletedAt?.toISOString()}`,
       payload: { documentId: document.id, workspaceId: document.workspaceId },
     });
+    await this.outbox.enqueue({
+      type: 'page.revalidate',
+      aggregateType: 'document',
+      aggregateId: document.id,
+      idempotencyKey: `revalidate:tree:delete:${document.id}:${document.deletedAt?.toISOString()}`,
+      payload: {
+        documentId: document.id,
+        tag: `workspace-tree:${document.workspaceId}`,
+        path: `/app/w/${document.workspaceId}`,
+      },
+    });
     return document;
   }
 
@@ -299,18 +344,23 @@ export class DocumentsService {
     if (!canEdit(level)) {
       throw new BadRequestException('Cannot publish this document');
     }
+    // Edge case: publish must project live Y.Doc (incl. edits not yet flushed).
+    await this.rooms.flushProjection(documentId);
+    const fresh = await this.prisma.document.findUniqueOrThrow({
+      where: { id: documentId },
+    });
     const publicSlug =
-      published && !document.publicSlug
-        ? slugify(document.title, randomBytes(4).toString('hex'))
-        : document.publicSlug;
+      published && !fresh.publicSlug
+        ? slugify(fresh.title, randomBytes(4).toString('hex'))
+        : fresh.publicSlug;
     const updated = await this.prisma.document.update({
       where: { id: documentId },
       data: {
         publicationStatus: published
           ? PublicationStatus.PUBLISHED
           : PublicationStatus.UNPUBLISHED,
-        publicSlug: published ? publicSlug : document.publicSlug,
-        publishedAt: published ? new Date() : document.publishedAt,
+        publicSlug: published ? publicSlug : fresh.publicSlug,
+        publishedAt: published ? new Date() : fresh.publishedAt,
       },
     });
     await this.outbox.enqueue({
@@ -318,7 +368,12 @@ export class DocumentsService {
       aggregateType: 'document',
       aggregateId: document.id,
       idempotencyKey: `revalidate:${document.id}:${updated.updatedAt.toISOString()}`,
-      payload: { slug: updated.publicSlug, documentId },
+      payload: {
+        slug: updated.publicSlug,
+        documentId,
+        tag: `workspace-tree:${document.workspaceId}`,
+        path: `/app/w/${document.workspaceId}`,
+      },
     });
     return updated;
   }

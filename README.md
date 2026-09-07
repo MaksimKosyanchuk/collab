@@ -38,7 +38,16 @@ Workspace page streams two independent Suspense boundaries: overview stats (`GET
 
 **Strong** (must be correct immediately): permissions, billing plan, membership, document access. Wrong answers here leak data or break ACL — REST and the collab gateway both check `AccessService` on every request / join / update.
 
-**Eventual**: Meilisearch index (BullMQ after persist), public page ISR cache (revalidate on publish / content change). Search and public HTML can lag a moment; that is acceptable because they are derived views, not the source of truth. Postgres + live Y.Doc remain authoritative.
+**Eventual**: Meilisearch index (BullMQ after persist), public page ISR cache (revalidate on publish / content change), workspace document tree (`unstable_cache` tag `workspace-tree:{id}`, invalidated on create / move / delete / title flush). Search, public HTML, and the tree can lag a moment; that is acceptable because they are derived views, not the source of truth. Postgres + live Y.Doc remain authoritative.
+
+## Edge cases
+
+| Case | Behaviour |
+|---|---|
+| Concurrent edits on the same block | Yjs CRDT merges both clients; no last-write-wins |
+| Document deleted while someone is editing | Gateway broadcasts `document_deleted`, closes sockets; UI shows deleted state and stops reconnect |
+| Publish with local edits still in the debounce window | `flushProjection` projects the live (or cold) Y.Doc into `DocumentProjection` before toggling publish; Publish is disabled while the editor is offline |
+| Replay of the same CRDT update / billing webhook | Update rows unique on `(documentId, hash)`; billing events unique — duplicates are no-ops |
 
 ## CRDT persistence policy
 

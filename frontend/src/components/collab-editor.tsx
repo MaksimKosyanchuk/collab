@@ -230,6 +230,7 @@ export function CollabEditor({
             documentId={documentId}
             initial={accessMeta}
             members={members}
+            liveReady={conn === 'online' && browserOnline}
           />
         ) : (
           <p className="border-t border-line pt-3 text-[12px] text-muted">
