@@ -7,6 +7,7 @@ import request from 'supertest';
 import WebSocket from 'ws';
 import * as Y from 'yjs';
 import { AppModule } from '../src/app.module';
+import { CollabAppModule } from '../src/collab-app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CollabRoomsService } from '../src/collab/collab-rooms.service';
 import { AccessLevel } from '../src/access/access.policy';
@@ -55,9 +56,11 @@ async function waitForMessage(
 
 describe('TZ critical flows (e2e)', () => {
   let app: INestApplication;
+  let collabApp: INestApplication;
   let prisma: PrismaService;
   let rooms: CollabRoomsService;
   let port: number;
+  let collabPort: number;
   const createdUserIds: string[] = [];
   const createdWorkspaceIds: string[] = [];
 
@@ -65,15 +68,35 @@ describe('TZ critical flows (e2e)', () => {
     process.env.NODE_ENV = 'test';
     process.env.CLIENT_URL = process.env.CLIENT_URL ?? 'http://localhost:3000';
     process.env.PORT = process.env.PORT ?? '3001';
+    process.env.COLLAB_PORT = process.env.COLLAB_PORT ?? '3002';
+    process.env.REDIS_HOST = process.env.REDIS_HOST ?? 'localhost';
+    process.env.REDIS_PORT = process.env.REDIS_PORT ?? '6379';
+    process.env.COLLAB_CMD_CHANNEL =
+      process.env.COLLAB_CMD_CHANNEL ?? 'e2e-collab:cmd';
+    process.env.COLLAB_REPLY_CHANNEL =
+      process.env.COLLAB_REPLY_CHANNEL ?? 'e2e-collab:reply';
     process.env.REVALIDATE_SECRET =
       process.env.REVALIDATE_SECRET ?? 'change-me-revalidate';
+
+    const collabFixture: TestingModule = await Test.createTestingModule({
+      imports: [CollabAppModule],
+    }).compile();
+    collabApp = collabFixture.createNestApplication();
+    collabApp.useWebSocketAdapter(new WsAdapter(collabApp));
+    await collabApp.init();
+    await collabApp.listen(0);
+    const collabAddress = collabApp.getHttpServer().address();
+    if (!collabAddress || typeof collabAddress === 'string') {
+      throw new Error('Failed to bind collab test server');
+    }
+    collabPort = collabAddress.port;
+    rooms = collabApp.get(CollabRoomsService);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useWebSocketAdapter(new WsAdapter(app));
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -89,7 +112,6 @@ describe('TZ critical flows (e2e)', () => {
     }
     port = address.port;
     prisma = app.get(PrismaService);
-    rooms = app.get(CollabRoomsService);
   });
 
   afterAll(async () => {
@@ -100,6 +122,7 @@ describe('TZ critical flows (e2e)', () => {
       await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
     }
     await app.close();
+    await collabApp.close();
   });
 
   async function register(
@@ -219,7 +242,7 @@ describe('TZ critical flows (e2e)', () => {
 
     async function openClient(label: string) {
       const ydoc = new Y.Doc();
-      const url = `ws://127.0.0.1:${port}/collab?documentId=${document.id}&token=${owner.tokens.accessToken}`;
+      const url = `ws://127.0.0.1:${collabPort}/collab?documentId=${document.id}&token=${owner.tokens.accessToken}`;
       const socket = new WebSocket(url);
       await new Promise<void>((resolve, reject) => {
         socket.once('open', () => resolve());

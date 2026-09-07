@@ -3,7 +3,7 @@ import { AccessService } from './access.service';
 
 @Global()
 @Module({
-  providers: [AccessService],
-  exports: [AccessService],
+	providers: [AccessService],
+	exports: [AccessService],
 })
 export class AccessModule {}

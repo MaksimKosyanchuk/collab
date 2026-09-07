@@ -12,7 +12,7 @@ import { SearchModule } from './search/search.module';
 import { CommentsModule } from './comments/comments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AssetsModule } from './assets/assets.module';
-import { CollabModule } from './collab/collab.module';
+import { CollabApiModule } from './collab/collab-api.module';
 import { LoggerModule } from './logger/logger.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { QueueModule } from './queue/queue.module';
@@ -20,30 +20,30 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { CorrelationInterceptor } from './common/interceptors/correlation.interceptor';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 120 }],
-    }),
-    PrismaModule,
-    LoggerModule,
-    MetricsModule,
-    QueueModule,
-    AccessModule,
-    AuthModule,
-    WorkspacesModule,
-    DocumentsModule,
-    BillingModule,
-    SearchModule,
-    CommentsModule,
-    NotificationsModule,
-    CollabModule,
-    AssetsModule,
-  ],
-  providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_FILTER, useClass: AllExceptionsFilter },
-    { provide: APP_INTERCEPTOR, useClass: CorrelationInterceptor },
-  ],
+	imports: [
+		ConfigModule.forRoot({ isGlobal: true }),
+		ThrottlerModule.forRoot({
+			throttlers: [{ ttl: 60_000, limit: 120 }],
+		}),
+		PrismaModule,
+		LoggerModule,
+		MetricsModule,
+		QueueModule,
+		CollabApiModule,
+		AccessModule,
+		AuthModule,
+		WorkspacesModule,
+		DocumentsModule,
+		BillingModule,
+		SearchModule,
+		CommentsModule,
+		NotificationsModule,
+		AssetsModule,
+	],
+	providers: [
+		{ provide: APP_GUARD, useClass: ThrottlerGuard },
+		{ provide: APP_FILTER, useClass: AllExceptionsFilter },
+		{ provide: APP_INTERCEPTOR, useClass: CorrelationInterceptor },
+	],
 })
 export class AppModule {}

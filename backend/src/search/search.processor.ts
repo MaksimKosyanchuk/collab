@@ -4,11 +4,11 @@ import { SearchService } from './search.service';
 
 @Processor('search-sync')
 export class SearchProcessor extends WorkerHost {
-  constructor(private readonly search: SearchService) {
-    super();
-  }
+	constructor(private readonly search: SearchService) {
+		super();
+	}
 
-  async process(job: Job<{ documentId: string }>): Promise<void> {
-    await this.search.indexDocument(job.data.documentId);
-  }
+	async process(job: Job<{ documentId: string }>): Promise<void> {
+		await this.search.indexDocument(job.data.documentId);
+	}
 }

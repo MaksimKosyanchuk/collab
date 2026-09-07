@@ -1,0 +1,204 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  JWT_ACCESS_SECRET: ci-access-secret
+  JWT_REFRESH_SECRET: ci-refresh-secret
+  REVALIDATE_SECRET: ci-revalidate-secret
+
+jobs:
+  # Job 1: builds + lints + unit tests (frontend & backend)
+  build-lint-unit:
+    name: Build / lint / unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Backend install
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend Prisma generate
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Backend lint (typecheck)
+        working-directory: backend
+        run: npm run lint
+
+      - name: Backend unit tests
+        working-directory: backend
+        run: npm test
+
+      - name: Backend build
+        working-directory: backend
+        run: npm run build
+
+      - name: Frontend install
+        working-directory: frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Frontend lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Frontend unit / component tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Frontend build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_WS_URL: ws://localhost:3002/collab
+        run: npm run build
+
+  # Job 2: full stack docker compose up
+  compose-up:
+    name: Compose up (full stack)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start stack
+        run: docker compose up --build -d
+
+      - name: Wait for healthy services
+        run: |
+          set -e
+          for i in $(seq 1 60); do
+            backend=$(docker inspect --format='{{.State.Health.Status}}' collab-backend 2>/dev/null || echo starting)
+            collab=$(docker inspect --format='{{.State.Health.Status}}' collab-gateway 2>/dev/null || echo starting)
+            frontend=$(docker inspect --format='{{.State.Health.Status}}' collab-frontend 2>/dev/null || echo starting)
+            echo "attempt $i backend=$backend collab=$collab frontend=$frontend"
+            if [ "$backend" = "healthy" ] && [ "$collab" = "healthy" ] && [ "$frontend" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose ps
+          docker compose logs --tail=200
+          exit 1
+
+      - name: Smoke HTTP
+        run: |
+          curl -fsS http://localhost:3001/metrics | head -c 200
+          curl -fsS http://localhost:3002/health
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:3000/
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:3001/api/docs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  # Job 3: compose deps + apps, then backend + Playwright e2e
+  e2e:
+    name: E2E (compose + tests)
+    runs-on: ubuntu-latest
+    needs: [build-lint-unit]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Start stack for e2e
+        run: docker compose up --build -d
+
+      - name: Wait for healthy services
+        run: |
+          set -e
+          for i in $(seq 1 60); do
+            backend=$(docker inspect --format='{{.State.Health.Status}}' collab-backend 2>/dev/null || echo starting)
+            collab=$(docker inspect --format='{{.State.Health.Status}}' collab-gateway 2>/dev/null || echo starting)
+            frontend=$(docker inspect --format='{{.State.Health.Status}}' collab-frontend 2>/dev/null || echo starting)
+            echo "attempt $i backend=$backend collab=$collab frontend=$frontend"
+            if [ "$backend" = "healthy" ] && [ "$collab" = "healthy" ] && [ "$frontend" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose ps
+          docker compose logs --tail=200
+          exit 1
+
+      - name: Backend install (e2e runner)
+        working-directory: backend
+        run: npm ci && npx prisma generate
+
+      - name: Backend e2e (Nest critical flows)
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/collab?schema=public
+          PORT: '3001'
+          COLLAB_PORT: '3002'
+          COLLAB_CMD_CHANNEL: e2e-collab:cmd
+          COLLAB_REPLY_CHANNEL: e2e-collab:reply
+          CLIENT_URL: http://localhost:3000
+          JWT_ACCESS_SECRET: ${{ env.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ env.JWT_REFRESH_SECRET }}
+          REDIS_HOST: localhost
+          REDIS_PORT: '6379'
+          MEILI_HOST: http://localhost:7700
+          MEILI_API_KEY: collab_meili_key
+          MINIO_ENDPOINT: localhost
+          MINIO_PORT: '9000'
+          MINIO_ACCESS_KEY: minio
+          MINIO_SECRET_KEY: minio12345
+          MINIO_BUCKET: collab
+          REVALIDATE_SECRET: ${{ env.REVALIDATE_SECRET }}
+          NEXT_REVALIDATE_URL: http://localhost:3000/api/revalidate
+        run: npm run test:e2e
+
+      - name: Frontend install (Playwright)
+        working-directory: frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright e2e (Viewer UI + /p/[slug] SSR)
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_SKIP_WEBSERVER: '1'
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_API_URL: http://localhost:3001
+          REVALIDATE_SECRET: ${{ env.REVALIDATE_SECRET }}
+        run: npm run test:e2e
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose logs --tail=300
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -4,25 +4,25 @@ import { ToastProvider } from '@/components/toast-provider';
 import './globals.css';
 
 const geist = Geist({
-  variable: '--font-sans-app',
-  subsets: ['latin'],
+	variable: '--font-sans-app',
+	subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: 'Collab Docs',
-  description: 'Collaborative workspace with real-time CRDT editing',
+	title: 'Collab Docs',
+	description: 'Collaborative workspace with real-time CRDT editing',
 };
 
 export default function RootLayout({
-  children,
+	children,
 }: Readonly<{
-  children: React.ReactNode;
+	children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en">
-      <body className={`${geist.variable} antialiased`}>
-        <ToastProvider>{children}</ToastProvider>
-      </body>
-    </html>
-  );
+	return (
+		<html lang="en">
+			<body className={`${geist.variable} antialiased`}>
+				<ToastProvider>{children}</ToastProvider>
+			</body>
+		</html>
+	);
 }
